@@ -1,6 +1,11 @@
 /**
  * calendar.js
- * Monatskalender anzeigen (Feiertage + Custom-Feiertage + Arbeitstage + Abwesenheiten)
+ * Monatskalender anzeigen (Feiertage + Custom-Feiertage + Arbeitstage + Abwesenheiten + Problem-Markierung)
+ *
+ * Rot markiert ("Issue") wenn:
+ * - Stempel auf dem Datum cutoffFlag=true
+ * - oder manualRequired=true
+ * - oder es gibt einen offenen IN ohne OUT (Tag vom offenen IN)
  */
 
 (function () {
@@ -11,6 +16,10 @@
     const m = pad2(d.getMonth() + 1);
     const day = pad2(d.getDate());
     return `${y}-${m}-${day}`;
+  }
+
+  function ymdFromParts(y, m, d) {
+    return `${String(y).padStart(4, "0")}-${pad2(m)}-${pad2(d)}`;
   }
 
   function monthStart(date) {
@@ -61,6 +70,51 @@
     return m;
   }
 
+  // --- Problem-Map aus Stempeln bauen ---
+  // Map: dateStr -> { issue:boolean, reasons:Set<string>, cutoff:boolean, openIn:boolean }
+  function getStampIssueMap() {
+    const map = new Map();
+
+    function ensure(dateStr) {
+      if (!map.has(dateStr)) {
+        map.set(dateStr, { issue: false, reasons: new Set(), cutoff: false, openIn: false });
+      }
+      return map.get(dateStr);
+    }
+
+    const data = StorageService.getData();
+    const stamps = Array.isArray(data.stamps) ? data.stamps : [];
+
+    // 1) cutoffFlag / manualRequired pro Datum
+    for (const s of stamps) {
+      if (!s || !s.year) continue;
+      const dateStr = ymdFromParts(s.year, s.month, s.day);
+      const entry = ensure(dateStr);
+
+      if (s.cutoffFlag) {
+        entry.issue = true;
+        entry.cutoff = true;
+        entry.reasons.add("Ausstempeln vergessen (03:00)");
+      }
+      if (s.manualRequired) {
+        entry.issue = true;
+        entry.reasons.add("Manuelle Prüfung nötig");
+      }
+    }
+
+    // 2) offener IN ohne OUT (nur letzter Zustand)
+    const last = stamps.length ? stamps[stamps.length - 1] : null;
+    if (last && last.type === "IN" && last.year) {
+      const dateStr = ymdFromParts(last.year, last.month, last.day);
+      const entry = ensure(dateStr);
+      entry.issue = true;
+      entry.openIn = true;
+      entry.reasons.add("Offener IN ohne OUT");
+    }
+
+    return map;
+  }
+
   function renderMonth(containerId, targetDate) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -68,6 +122,7 @@
     const settings = getSettingsSafe();
     const workdays = getWorkdaysSafe(settings);
     const absMap = getAbsenceMap();
+    const issueMap = getStampIssueMap();
 
     const now = targetDate || new Date();
     const start = monthStart(now);
@@ -97,6 +152,7 @@
       const requiredFraction = 1 - offFactor;
 
       const abs = absMap.get(dateStr) || null;
+      const issues = issueMap.get(dateStr) || null;
 
       cells.push({
         empty: false,
@@ -107,7 +163,8 @@
         isLegal: !!legal.isHoliday,
         customOff,
         requiredFraction,
-        abs
+        abs,
+        issues
       });
 
       d.setDate(d.getDate() + 1);
@@ -163,19 +220,31 @@
 
       if (abs) classes.push("cal-abs");
 
+      const issues = cell.issues;
+      const hasIssue = !!(issues && issues.issue);
+      if (hasIssue) classes.push("cal-issue");
+      if (issues && issues.cutoff) classes.push("cal-cutoff");
+
+      const issueTitle = hasIssue ? Array.from(issues.reasons).join(" • ") : "";
+
       const div = document.createElement("div");
       div.className = classes.join(" ");
+      if (hasIssue) div.title = issueTitle;
 
       div.innerHTML = `
         <div class="cal-daynum">${cell.day}</div>
+
         <div class="cal-meta">
           ${cell.isWorkday ? `<span class="badge">Soll</span>` : `<span class="badge ghost">frei</span>`}
           ${cell.requiredFraction === 0 ? `<span class="badge warn">Feiertag</span>` : ""}
           ${cell.requiredFraction < 1 && cell.requiredFraction > 0 ? `<span class="badge warn">teilfrei</span>` : ""}
           ${abs ? `<span class="badge info">${absBadge}</span>` : ""}
+          ${hasIssue ? `<span class="badge danger">⚠</span>` : ""}
         </div>
+
         <div class="cal-label">${cell.isLegal ? cell.legalName : ""}</div>
         <div class="cal-label muted">${cell.customOff > 0 ? (cell.customOff === 1 ? "Custom frei" : `Custom Faktor ${cell.customOff}`) : ""}</div>
+        <div class="cal-label danger-text">${hasIssue ? issueTitle : ""}</div>
       `;
 
       calDays.appendChild(div);
