@@ -1,1 +1,434 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stempeluhr – Einstellungen</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="stylesheet" href="/src/css/style.css" />
+</head>
+<body>
+
+  <header class="topbar">
+    <div>
+      <h1>Einstellungen</h1>
+      <p class="muted">Alles wird lokal im Browser gespeichert</p>
+    </div>
+
+    <nav class="nav">
+      <a class="btn secondary" href="/">Zurück</a>
+      <a class="btn" href="/toggle">Jetzt stempeln</a>
+    </nav>
+  </header>
+
+  <main class="container">
+
+    <section class="card">
+      <h2>Wochenstunden</h2>
+
+      <div class="grid2">
+        <div>
+          <label class="label" for="weeklyHours">Wochenstunden (frei)</label>
+          <input id="weeklyHours" type="number" step="0.01" min="0" placeholder="z. B. 37.5" style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+          <p class="muted small">Diese Eingabe hat Vorrang, wenn du sie nutzt.</p>
+        </div>
+
+        <div>
+          <label class="label" for="weeklyPercent">Wochenstunden in % (40h = 100%)</label>
+          <input id="weeklyPercent" type="number" step="0.01" min="0" placeholder="z. B. 80" style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+          <p class="muted small">Wenn du % eingibst, wird intern in Stunden umgerechnet (40h = 100%).</p>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:0.75rem;">
+        <button class="btn" id="btnSaveHours" type="button">Speichern</button>
+        <span class="muted small" id="hoursSavedHint">–</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Arbeitstage (für Sollstunden)</h2>
+      <p class="muted small">Standard: Montag bis Freitag</p>
+
+      <div class="actions" id="workdaysWrap">
+        <!-- Checkboxes werden per JS eingefügt -->
+      </div>
+
+      <div class="row" style="margin-top:0.75rem;">
+        <button class="btn" id="btnSaveWorkdays" type="button">Speichern</button>
+        <span class="muted small" id="workdaysSavedHint">–</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Bundesland & Feiertage</h2>
+
+      <div class="grid2">
+        <div>
+          <label class="label" for="stateSelect">Bundesland</label>
+          <select id="stateSelect" style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+            <option value="">Bitte wählen…</option>
+            <option value="BW">Baden-Württemberg</option>
+            <option value="BY">Bayern</option>
+            <option value="BE">Berlin</option>
+            <option value="BB">Brandenburg</option>
+            <option value="HB">Bremen</option>
+            <option value="HH">Hamburg</option>
+            <option value="HE">Hessen</option>
+            <option value="MV">Mecklenburg-Vorpommern</option>
+            <option value="NI">Niedersachsen</option>
+            <option value="NW">Nordrhein-Westfalen</option>
+            <option value="RP">Rheinland-Pfalz</option>
+            <option value="SL">Saarland</option>
+            <option value="SN">Sachsen</option>
+            <option value="ST">Sachsen-Anhalt</option>
+            <option value="SH">Schleswig-Holstein</option>
+            <option value="TH">Thüringen</option>
+          </select>
+          <p class="muted small">Feiertage werden später aus diesem Bundesland abgeleitet.</p>
+        </div>
+
+        <div>
+          <label class="label">Option</label>
+          <label style="display:flex; gap:0.5rem; align-items:center; margin-top:0.3rem;">
+            <input id="ignoreHolidays" type="checkbox" />
+            <span>Feiertage ignorieren (wenn du an Feiertagen arbeiten musst)</span>
+          </label>
+          <p class="muted small">Wenn aktiv, zählen Feiertage nicht als arbeitsfrei in der Sollzeit.</p>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:0.75rem;">
+        <button class="btn" id="btnSaveHolidays" type="button">Speichern</button>
+        <span class="muted small" id="holidaysSavedHint">–</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Personalisierte Feiertage (z. B. halber Tag)</h2>
+      <p class="muted small">
+        Hier kannst du eigene Tage ergänzen, z. B. 24.12. oder 31.12. als 0.5.
+      </p>
+
+      <div class="grid2">
+        <div>
+          <label class="label" for="customDate">Datum (YYYY-MM-DD)</label>
+          <input id="customDate" type="text" placeholder="2026-12-24" style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+        </div>
+        <div>
+          <label class="label" for="customFactor">Faktor (1 = frei, 0.5 = halber Tag)</label>
+          <input id="customFactor" type="number" step="0.01" min="0" max="1" placeholder="0.5" style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:0.75rem;">
+        <button class="btn" id="btnAddCustom" type="button">Hinzufügen</button>
+        <button class="btn secondary" id="btnClearCustom" type="button">Alle löschen</button>
+        <span class="muted small" id="customSavedHint">–</span>
+      </div>
+
+      <div class="table-wrap" style="margin-top:0.75rem;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Datum</th>
+              <th>Faktor</th>
+              <th>Aktion</th>
+            </tr>
+          </thead>
+          <tbody id="customTbody">
+            <tr><td colspan="3" class="muted">Noch keine personalisierten Feiertage</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Urlaub</h2>
+
+      <div class="grid2">
+        <div>
+          <label class="label" for="vacationAvailable">Verfügbare Urlaubstage</label>
+          <input id="vacationAvailable" type="number" step="1" min="0" placeholder="z. B. 30" style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+          <p class="muted small">Wird später für Urlaubs-Tracking und Auswertungen genutzt.</p>
+        </div>
+        <div>
+          <label class="label">Hinweis</label>
+          <p class="muted small" style="margin-top:0.3rem;">
+            Nicht gestempelte Soll-Tage werden später automatisch als Urlaub markiert und können nachträglich auf Krankheit oder Arbeit geändert werden.
+          </p>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:0.75rem;">
+        <button class="btn" id="btnSaveVacation" type="button">Speichern</button>
+        <span class="muted small" id="vacationSavedHint">–</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Wartung</h2>
+      <div class="row">
+        <button class="btn secondary" id="btnResetAll" type="button">Alle lokalen Daten löschen</button>
+        <span class="muted small">Vorsicht: löscht Stempel + Einstellungen</span>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/src/js/storage.js"></script>
+
+  <script>
+    (function () {
+      const DAYS = [
+        { key: "mon", label: "Mo" },
+        { key: "tue", label: "Di" },
+        { key: "wed", label: "Mi" },
+        { key: "thu", label: "Do" },
+        { key: "fri", label: "Fr" },
+        { key: "sat", label: "Sa" },
+        { key: "sun", label: "So" }
+      ];
+
+      function setHint(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+      }
+
+      function getSettings() {
+        return StorageService.getSettings() || {};
+      }
+
+      function saveSettings(patch) {
+        StorageService.updateSettings(patch);
+      }
+
+      function parseDateYYYYMMDD(s) {
+        // Nur Formatprüfung (lokal) – echte Feiertagslogik kommt später
+        if (typeof s !== "string") return null;
+        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m) return null;
+        const y = Number(m[1]);
+        const mo = Number(m[2]);
+        const d = Number(m[3]);
+        if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+        return s;
+      }
+
+      function renderWorkdays(settings) {
+        const wrap = document.getElementById("workdaysWrap");
+        wrap.innerHTML = "";
+
+        const defaultDays = { mon:true, tue:true, wed:true, thu:true, fri:true, sat:false, sun:false };
+        const workdays = settings.workdays || defaultDays;
+
+        DAYS.forEach(day => {
+          const label = document.createElement("label");
+          label.className = "btn secondary";
+          label.style.display = "flex";
+          label.style.alignItems = "center";
+          label.style.gap = "0.4rem";
+
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.id = "wd_" + day.key;
+          cb.checked = !!workdays[day.key];
+
+          const span = document.createElement("span");
+          span.textContent = day.label;
+
+          label.appendChild(cb);
+          label.appendChild(span);
+          wrap.appendChild(label);
+        });
+      }
+
+      function renderCustom(settings) {
+        const tbody = document.getElementById("customTbody");
+        const list = Array.isArray(settings.customHolidays) ? settings.customHolidays : [];
+        tbody.innerHTML = "";
+
+        if (list.length === 0) {
+          const tr = document.createElement("tr");
+          const td = document.createElement("td");
+          td.colSpan = 3;
+          td.className = "muted";
+          td.textContent = "Noch keine personalisierten Feiertage";
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+
+        list
+          .slice()
+          .sort((a,b) => String(a.date).localeCompare(String(b.date)))
+          .forEach((item, idx) => {
+            const tr = document.createElement("tr");
+
+            const tdDate = document.createElement("td");
+            tdDate.textContent = item.date;
+            tr.appendChild(tdDate);
+
+            const tdFactor = document.createElement("td");
+            tdFactor.textContent = String(item.factor);
+            tr.appendChild(tdFactor);
+
+            const tdAct = document.createElement("td");
+            const btn = document.createElement("button");
+            btn.className = "btn secondary";
+            btn.type = "button";
+            btn.textContent = "Entfernen";
+            btn.addEventListener("click", () => {
+              const s = getSettings();
+              const cur = Array.isArray(s.customHolidays) ? s.customHolidays : [];
+              cur.splice(idx, 1);
+              saveSettings({ customHolidays: cur });
+              renderCustom(getSettings());
+              setHint("customSavedHint", "Eintrag entfernt");
+            });
+            tdAct.appendChild(btn);
+            tr.appendChild(tdAct);
+
+            tbody.appendChild(tr);
+          });
+      }
+
+      function loadIntoForm() {
+        const s = getSettings();
+
+        // Wochenstunden / Prozent
+        document.getElementById("weeklyHours").value =
+          (typeof s.weeklyHours === "number") ? s.weeklyHours : "";
+        document.getElementById("weeklyPercent").value =
+          (typeof s.weeklyPercent === "number") ? s.weeklyPercent : "";
+
+        // Bundesland / Feiertage
+        document.getElementById("stateSelect").value = s.state || "";
+        document.getElementById("ignoreHolidays").checked = !!s.ignoreHolidays;
+
+        // Urlaub
+        document.getElementById("vacationAvailable").value =
+          (typeof s.vacationAvailable === "number") ? s.vacationAvailable : "";
+
+        renderWorkdays(s);
+        renderCustom(s);
+      }
+
+      // --- Save: Stunden/Prozent
+      document.getElementById("btnSaveHours").addEventListener("click", () => {
+        const hoursRaw = document.getElementById("weeklyHours").value;
+        const percRaw = document.getElementById("weeklyPercent").value;
+
+        const patch = {};
+
+        // Wenn Stunden angegeben sind → übernehmen
+        if (hoursRaw !== "" && !Number.isNaN(Number(hoursRaw))) {
+          patch.weeklyHours = Number(hoursRaw);
+          patch.weeklyPercent = null;
+        }
+
+        // Wenn Prozent angegeben sind → übernehmen und in Stunden umrechnen
+        if (percRaw !== "" && !Number.isNaN(Number(percRaw))) {
+          const p = Number(percRaw);
+          patch.weeklyPercent = p;
+          patch.weeklyHours = (p / 100) * 40;
+        }
+
+        saveSettings(patch);
+        setHint("hoursSavedHint", "Gespeichert");
+      });
+
+      // --- Save: Workdays
+      document.getElementById("btnSaveWorkdays").addEventListener("click", () => {
+        const wd = {};
+        DAYS.forEach(day => {
+          const cb = document.getElementById("wd_" + day.key);
+          wd[day.key] = !!(cb && cb.checked);
+        });
+        saveSettings({ workdays: wd });
+        setHint("workdaysSavedHint", "Gespeichert");
+      });
+
+      // --- Save: Bundesland / Feiertage-Option
+      document.getElementById("btnSaveHolidays").addEventListener("click", () => {
+        const state = document.getElementById("stateSelect").value;
+        const ignore = document.getElementById("ignoreHolidays").checked;
+        saveSettings({ state, ignoreHolidays: ignore });
+        setHint("holidaysSavedHint", "Gespeichert");
+      });
+
+      // --- Custom holiday add
+      document.getElementById("btnAddCustom").addEventListener("click", () => {
+        const dateRaw = document.getElementById("customDate").value.trim();
+        const factorRaw = document.getElementById("customFactor").value;
+
+        const date = parseDateYYYYMMDD(dateRaw);
+        const factor = Number(factorRaw);
+
+        if (!date) {
+          setHint("customSavedHint", "Ungültiges Datum (YYYY-MM-DD)");
+          return;
+        }
+        if (Number.isNaN(factor) || factor < 0 || factor > 1) {
+          setHint("customSavedHint", "Ungültiger Faktor (0..1)");
+          return;
+        }
+
+        const s = getSettings();
+        const cur = Array.isArray(s.customHolidays) ? s.customHolidays : [];
+
+        // Duplikate vermeiden: Datum überschreibt
+        const existingIdx = cur.findIndex(x => x.date === date);
+        if (existingIdx >= 0) {
+          cur[existingIdx] = { date, factor };
+        } else {
+          cur.push({ date, factor });
+        }
+
+        saveSettings({ customHolidays: cur });
+        document.getElementById("customDate").value = "";
+        document.getElementById("customFactor").value = "";
+
+        renderCustom(getSettings());
+        setHint("customSavedHint", "Gespeichert");
+      });
+
+      document.getElementById("btnClearCustom").addEventListener("click", () => {
+        saveSettings({ customHolidays: [] });
+        renderCustom(getSettings());
+        setHint("customSavedHint", "Alle personalisierten Feiertage gelöscht");
+      });
+
+      // --- Save: Vacation available
+      document.getElementById("btnSaveVacation").addEventListener("click", () => {
+        const raw = document.getElementById("vacationAvailable").value;
+        if (raw === "") {
+          saveSettings({ vacationAvailable: null });
+          setHint("vacationSavedHint", "Gespeichert (leer)");
+          return;
+        }
+        const n = Number(raw);
+        if (Number.isNaN(n) || n < 0) {
+          setHint("vacationSavedHint", "Ungültige Zahl");
+          return;
+        }
+        saveSettings({ vacationAvailable: Math.floor(n) });
+        setHint("vacationSavedHint", "Gespeichert");
+      });
+
+      // --- Reset
+      document.getElementById("btnResetAll").addEventListener("click", () => {
+        const ok = confirm("Wirklich ALLE lokalen Daten löschen? (Stempel + Einstellungen)");
+        if (!ok) return;
+        StorageService.clearAll();
+        loadIntoForm();
+        alert("Lokale Daten wurden gelöscht.");
+      });
+
+      loadIntoForm();
+    })();
+  </script>
+
+</body>
+</html>
 
