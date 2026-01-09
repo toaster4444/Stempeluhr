@@ -1,10 +1,14 @@
 /**
  * holidays.js
- * Gesetzliche Feiertage je Bundesland (DE) + bewegliche Feiertage (Ostern-basiert).
+ * Gesetzliche Feiertage je Bundesland (DE) + lokale Profile (Wohnort/Ort-spezifisch über Auswahl).
  * Rein lokal, keine Server-Calls.
  *
- * Hinweis: Einige Feiertage haben lokale Ausnahmen (z.B. Mariä Himmelfahrt in BY teils nur in katholischen Gemeinden).
- * Diese Implementierung bildet eine praxistaugliche Bundesland-Logik ab.
+ * Lokale Profile (aktuell implementiert):
+ * - BY: AUGSBURG -> Augsburger Friedensfest (08.08.)
+ * - BY: ASSUMPTION_LOCAL -> Mariä Himmelfahrt (15.08.) als lokal aktiv
+ *
+ * Hinweis: Vollständige Gemeinde-Tabellen (z.B. BY Mariä Himmelfahrt je Gemeinde) sind groß.
+ * Deshalb nutzen wir Profile/Optionen, die der Nutzer auswählt.
  */
 
 (function () {
@@ -42,7 +46,7 @@
     return new Date(year, month - 1, day, 0, 0, 0, 0);
   }
 
-  function makeHolidayMap(year, stateCode) {
+  function makeHolidayMap(year, stateCode, localProfile) {
     const map = {}; // date -> name
 
     function add(dateStr, name) {
@@ -63,8 +67,8 @@
     add(ymd(addDays(easter, +39)), "Christi Himmelfahrt");
     add(ymd(addDays(easter, +50)), "Pfingstmontag");
 
-    // State-specific extras
     const S = String(stateCode || "").toUpperCase();
+    const P = String(localProfile || "").toUpperCase();
 
     // Epiphany: BW, BY, ST
     if (["BW", "BY", "ST"].includes(S)) {
@@ -81,9 +85,13 @@
       add(ymd(addDays(easter, +60)), "Fronleichnam");
     }
 
-    // Assumption (Mariä Himmelfahrt): SL, BY (mit lokalen Ausnahmen in BY)
-    if (["SL", "BY"].includes(S)) {
+    // Assumption (Mariä Himmelfahrt):
+    // SL always, BY only local -> use profile
+    if (["SL"].includes(S)) {
       add(`${year}-08-15`, "Mariä Himmelfahrt");
+    }
+    if (["BY"].includes(S) && P === "ASSUMPTION_LOCAL") {
+      add(`${year}-08-15`, "Mariä Himmelfahrt (lokal)");
     }
 
     // World Children's Day: TH
@@ -103,42 +111,60 @@
 
     // Repentance Day (Buß- und Bettag): SN (Wednesday before Nov 23)
     if (["SN"].includes(S)) {
-      // Find Nov 23
-      const nov23 = new Date(year, 10, 23, 0, 0, 0, 0); // month 10 = November
-      // We need the Wednesday before Nov 23. If Nov 23 is Wed, take previous Wed (7 days before) or "before" meaning strictly before.
-      // In Germany: Buß- und Bettag is the Wednesday before November 23 (i.e., in the week before the 23rd).
-      // Compute: go back to previous Wednesday (could be same day if Wed? then go back 7).
+      const nov23 = new Date(year, 10, 23, 0, 0, 0, 0); // November
       let d = new Date(nov23.getTime());
-      const dow = d.getDay(); // Sun=0 .. Sat=6, Wed=3
-      const diff = (dow - 3 + 7) % 7; // days since Wednesday
+      const dow = d.getDay(); // Wed=3
+      const diff = (dow - 3 + 7) % 7;
       d.setDate(d.getDate() - diff);
-      if (d.getTime() === nov23.getTime()) {
-        d.setDate(d.getDate() - 7);
-      }
+      if (d.getTime() === nov23.getTime()) d.setDate(d.getDate() - 7);
       add(ymd(d), "Buß- und Bettag");
     }
 
-    // Brandenburg-only: Easter Sunday, Whit Sunday (commonly local holiday)
+    // Brandenburg-only: Easter Sunday, Whit Sunday
     if (["BB"].includes(S)) {
       add(ymd(addDays(easter, 0)), "Ostersonntag");
       add(ymd(addDays(easter, +49)), "Pfingstsonntag");
     }
 
+    // Local-only: Augsburg Peace Festival (Augsburger Friedensfest) - BY, Augsburg city
+    if (S === "BY" && P === "AUGSBURG") {
+      add(`${year}-08-08`, "Augsburger Friedensfest (lokal)");
+    }
+
     return map;
   }
 
-  function getHolidayMapForYear(stateCode, year) {
-    return makeHolidayMap(year, stateCode);
+  /**
+   * Returns { isHoliday, name, offFactor }
+   * offFactor: 1 if it counts as "arbeitsfrei" for SOLL (unless ignoreHolidays is true)
+   */
+  function getHolidayInfo(settings, dateObj) {
+    const ignore = !!(settings && settings.ignoreHolidays);
+    if (ignore) {
+      return { isHoliday: false, name: "", offFactor: 0 };
+    }
+
+    const state = settings && settings.state ? settings.state : "";
+    const profile = settings && settings.localProfile ? settings.localProfile : "";
+
+    const map = makeHolidayMap(dateObj.getFullYear(), state, profile);
+    const name = map[ymd(dateObj)] || "";
+    const isHoliday = !!name;
+
+    return { isHoliday, name, offFactor: isHoliday ? 1 : 0 };
   }
 
-  function isHoliday(stateCode, dateObj) {
-    const year = dateObj.getFullYear();
-    const map = makeHolidayMap(year, stateCode);
-    return !!map[ymd(dateObj)];
+  /**
+   * For UI: list holidays for a year.
+   */
+  function getHolidayMapForYear(settings, year) {
+    const state = settings && settings.state ? settings.state : "";
+    const profile = settings && settings.localProfile ? settings.localProfile : "";
+    return makeHolidayMap(year, state, profile);
   }
 
   window.HolidaysService = {
-    getHolidayMapForYear,
-    isHoliday
+    getHolidayInfo,
+    getHolidayMapForYear
   };
 })();
