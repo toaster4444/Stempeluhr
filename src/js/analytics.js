@@ -3,8 +3,8 @@
  * Wochen- & Monatsauswertung aus Rohdaten (stamps).
  * - rein lokal
  * - berechnet IST-Zeit aus IN/OUT-Paaren
- * - Zielzeiten aus Einstellungen (weeklyHours + workdays)
- * - Feiertage/Urlaub/Krankheit werden später ergänzt
+ * - SOLL-Zeit aus Einstellungen (weeklyHours + workdays)
+ * - Feiertage (je Bundesland) + Custom-Feiertage (Faktor) fließen in SOLL ein
  */
 
 (function () {
@@ -32,8 +32,7 @@
 
   function startOfWeekMonday(date) {
     const d = startOfDay(date);
-    // JS: So=0, Mo=1 ... Sa=6
-    const day = d.getDay();
+    const day = d.getDay(); // So=0, Mo=1
     const diffToMonday = (day === 0) ? -6 : (1 - day);
     d.setDate(d.getDate() + diffToMonday);
     return d;
@@ -82,7 +81,6 @@
           });
           openIn = null;
         } else {
-          // OUT ohne passendes IN -> ignorieren, aber als "unmatched" melden
           sessions.push({
             startTs: null,
             endTs: st.timestamp,
@@ -128,31 +126,83 @@
     return sign + hours.toFixed(2);
   }
 
-  function countWorkdaysInRange(start, endExclusive, workdays) {
-    // zählt Tage im Bereich [start, endExclusive), die in workdays=true sind
-    let count = 0;
+  function weekdayKey(d) {
+    const dow = d.getDay(); // 0..6
+    return dow === 1 ? "mon"
+      : dow === 2 ? "tue"
+      : dow === 3 ? "wed"
+      : dow === 4 ? "thu"
+      : dow === 5 ? "fri"
+      : dow === 6 ? "sat"
+      : "sun";
+  }
+
+  function ymd(d) {
+    const y = String(d.getFullYear()).padStart(4, "0");
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  function getWeeklyHoursFromSettings(settings) {
+    if (settings && typeof settings.weeklyHours === "number") return settings.weeklyHours;
+    if (settings && typeof settings.weeklyPercent === "number") return (settings.weeklyPercent / 100) * 40;
+    return null;
+  }
+
+  function customHolidayFactorForDate(settings, dateStr) {
+    const list = Array.isArray(settings.customHolidays) ? settings.customHolidays : [];
+    const found = list.find(x => x && x.date === dateStr);
+    if (!found) return 0;
+    const f = Number(found.factor);
+    if (Number.isNaN(f) || f < 0) return 0;
+    return Math.min(1, f);
+  }
+
+  function legalHolidayFactorForDate(settings, dateObj) {
+    const ignore = !!settings.ignoreHolidays;
+    if (ignore) return 0;
+
+    const state = settings.state || "";
+    if (!window.HolidaysService) return 0;
+
+    return HolidaysService.isHoliday(state, dateObj) ? 1 : 0;
+  }
+
+  /**
+   * SOLL-Stunden über Zeitraum: sum(dailyTarget * requiredFraction) über alle Soll-Arbeitstage
+   * requiredFraction = 1 - offFraction
+   * offFraction = max(gesetzl. Feiertag (0/1), customFactor (0..1))
+   */
+  function computeTargetHoursForRange(settings, workdays, dailyTarget, start, endExclusive) {
+    if (dailyTarget === null || dailyTarget === undefined) return null;
+
+    let target = 0;
     const d = new Date(start.getTime());
 
     while (d < endExclusive) {
-      const dow = d.getDay(); // 0..6
-      const key =
-        dow === 1 ? "mon" :
-        dow === 2 ? "tue" :
-        dow === 3 ? "wed" :
-        dow === 4 ? "thu" :
-        dow === 5 ? "fri" :
-        dow === 6 ? "sat" : "sun";
+      d.setHours(0, 0, 0, 0);
 
-      if (workdays[key]) count += 1;
+      const key = weekdayKey(d);
+      if (workdays[key]) {
+        const dateStr = ymd(d);
+
+        const legalOff = legalHolidayFactorForDate(settings, d);     // 0 oder 1
+        const customOff = customHolidayFactorForDate(settings, dateStr); // 0..1
+
+        const offFraction = Math.max(legalOff, customOff);
+        const requiredFraction = 1 - offFraction;
+
+        target += dailyTarget * requiredFraction;
+      }
 
       d.setDate(d.getDate() + 1);
-      d.setHours(0, 0, 0, 0);
     }
 
-    return count;
+    return target;
   }
 
-  function computePeriod(stamps, periodStart, periodEndExclusive) {
+  function computePeriodWorked(stamps, periodStart, periodEndExclusive) {
     const sorted = sortStamps(stamps);
     const sessions = buildSessions(sorted);
 
@@ -167,7 +217,12 @@
       if (sess.unmatched === "OUT_WITHOUT_IN") unmatchedOutCount += 1;
 
       if (typeof sess.startTs === "number" && typeof sess.endTs === "number") {
-        workedMs += overlapMs(sess.startTs, sess.endTs, periodStart.getTime(), periodEndExclusive.getTime());
+        workedMs += overlapMs(
+          sess.startTs,
+          sess.endTs,
+          periodStart.getTime(),
+          periodEndExclusive.getTime()
+        );
       }
     }
 
@@ -179,39 +234,15 @@
     };
   }
 
-  function getWeeklyHoursFromSettings(settings) {
-    if (settings && typeof settings.weeklyHours === "number") return settings.weeklyHours;
-    if (settings && typeof settings.weeklyPercent === "number") return (settings.weeklyPercent / 100) * 40;
-    return null;
-  }
+  function getSummary() {
+    const data = window.StorageService ? StorageService.getData() : { stamps: [] };
+    const stamps = Array.isArray(data.stamps) ? data.stamps : [];
 
-  function computeTargetsForWeekAndMonth(nowDate) {
     const settings = getSettingsSafe();
     const workdays = getWorkdaysSafe(settings);
 
     const weeklyHours = getWeeklyHoursFromSettings(settings);
     const selectedDaysPerWeek = countSelectedWorkdaysPerWeek(workdays);
-
-    const weekTarget = weeklyHours; // Wochenziel = Wochenstunden
-
-    // Monatsziel: Tagesziel * Anzahl Arbeitstage im Monat
-    let monthTarget = null;
-    if (weeklyHours !== null && selectedDaysPerWeek > 0) {
-      const dailyTarget = weeklyHours / selectedDaysPerWeek;
-
-      const mStart = startOfMonth(nowDate);
-      const mEnd = endOfMonthExclusive(nowDate);
-      const workdaysInMonth = countWorkdaysInRange(mStart, mEnd, workdays);
-
-      monthTarget = dailyTarget * workdaysInMonth;
-    }
-
-    return { weekTarget, monthTarget, weeklyHours, selectedDaysPerWeek };
-  }
-
-  function getSummary() {
-    const data = window.StorageService ? StorageService.getData() : { stamps: [] };
-    const stamps = Array.isArray(data.stamps) ? data.stamps : [];
 
     const now = new Date();
 
@@ -221,47 +252,50 @@
     const mStart = startOfMonth(now);
     const mEnd = endOfMonthExclusive(now);
 
-    const week = computePeriod(stamps, wStart, wEnd);
-    const month = computePeriod(stamps, mStart, mEnd);
+    const weekWorked = computePeriodWorked(stamps, wStart, wEnd);
+    const monthWorked = computePeriodWorked(stamps, mStart, mEnd);
 
-    const targets = computeTargetsForWeekAndMonth(now);
+    let dailyTarget = null;
+    if (weeklyHours !== null && selectedDaysPerWeek > 0) {
+      dailyTarget = weeklyHours / selectedDaysPerWeek;
+    }
 
-    const weekDiff = (targets.weekTarget !== null) ? (week.workedHours - targets.weekTarget) : null;
-    const monthDiff = (targets.monthTarget !== null) ? (month.workedHours - targets.monthTarget) : null;
+    const weekTarget = computeTargetHoursForRange(settings, workdays, dailyTarget, wStart, wEnd);
+    const monthTarget = computeTargetHoursForRange(settings, workdays, dailyTarget, mStart, mEnd);
+
+    const weekDiff = (weekTarget !== null) ? (weekWorked.workedHours - weekTarget) : null;
+    const monthDiff = (monthTarget !== null) ? (monthWorked.workedHours - monthTarget) : null;
 
     return {
       week: {
         start: wStart,
         endExclusive: wEnd,
-        workedHours: week.workedHours,
-        targetHours: targets.weekTarget,
+        workedHours: weekWorked.workedHours,
+        targetHours: weekTarget,
         diffHours: weekDiff,
-        manualCount: week.manualCount,
-        openCount: week.openCount,
-        unmatchedOutCount: week.unmatchedOutCount
+        manualCount: weekWorked.manualCount,
+        openCount: weekWorked.openCount,
+        unmatchedOutCount: weekWorked.unmatchedOutCount
       },
       month: {
         start: mStart,
         endExclusive: mEnd,
-        workedHours: month.workedHours,
-        targetHours: targets.monthTarget,
+        workedHours: monthWorked.workedHours,
+        targetHours: monthTarget,
         diffHours: monthDiff,
-        manualCount: month.manualCount,
-        openCount: month.openCount,
-        unmatchedOutCount: month.unmatchedOutCount
+        manualCount: monthWorked.manualCount,
+        openCount: monthWorked.openCount,
+        unmatchedOutCount: monthWorked.unmatchedOutCount
       },
       meta: {
-        weeklyHoursSetting: targets.weeklyHours,
-        selectedWorkdaysPerWeek: targets.selectedDaysPerWeek
+        weeklyHoursSetting: weeklyHours,
+        selectedWorkdaysPerWeek: selectedDaysPerWeek
       }
     };
   }
 
   function formatDateYYYYMMDD(d) {
-    const y = String(d.getFullYear()).padStart(4, "0");
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
+    return ymd(d);
   }
 
   window.Analytics = {
