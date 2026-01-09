@@ -5,7 +5,6 @@
   <title>Stempeluhr – Übersicht</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- PWA / App-Icons -->
   <link rel="manifest" href="/public/manifest.json" />
   <meta name="theme-color" content="#1f2933" />
 
@@ -27,7 +26,6 @@
 
   <main class="container">
 
-    <!-- AUSWERTUNG -->
     <section class="card">
       <div class="row">
         <h2>Auswertung</h2>
@@ -75,20 +73,45 @@
       </div>
 
       <p class="muted small" style="margin-top:0.75rem;">
-        SOLL berücksichtigt: Wochenstunden + Arbeitstage + Feiertage (Bundesland + ggf. lokales Profil) + personalisierte Feiertage.
+        SOLL berücksichtigt: Wochenstunden + Arbeitstage + Feiertage + Custom. (Urlaub/Krankheit reduziert SOLL im nächsten Schritt.)
       </p>
     </section>
 
-    <!-- KALENDER -->
     <section class="card">
-      <h2>Kalender (Feiertage)</h2>
+      <h2>Kalender (Feiertage & Abwesenheiten)</h2>
       <div id="calendarMount"></div>
-      <p class="muted small" style="margin-top:0.75rem;">
-        Legende: „Soll“ = geplanter Arbeitstag. „frei“ = Feiertag/Custom reduziert SOLL.
-      </p>
     </section>
 
-    <!-- STATUS -->
+    <section class="card">
+      <div class="row">
+        <h2>Fehltage (Urlaub/Krankheit)</h2>
+        <div class="row-right">
+          <button class="btn secondary" id="btnAbsRefresh" type="button">Aktualisieren</button>
+        </div>
+      </div>
+
+      <p class="muted small">
+        Automatisch: Soll-Tage ohne Stempel werden bis gestern als <b>Urlaub (auto)</b> markiert.
+        Du kannst jeden Tag auf <b>Krank</b> umstellen oder als <b>Arbeit (manuell)</b> markieren.
+      </p>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Datum</th>
+              <th>Status</th>
+              <th>Auto</th>
+              <th>Aktionen</th>
+            </tr>
+          </thead>
+          <tbody id="absTbody">
+            <tr><td colspan="4" class="muted">Keine</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="card">
       <h2>Status</h2>
       <div class="grid2">
@@ -106,7 +129,6 @@
       </div>
     </section>
 
-    <!-- ROHDATEN -->
     <section class="card">
       <div class="row">
         <h2>Rohdaten (letzte 30)</h2>
@@ -148,9 +170,10 @@
   <script src="/src/js/storage.js"></script>
   <script src="/src/js/export.js"></script>
 
-  <!-- Feiertage müssen vor Analytics/Kalender geladen werden -->
   <script src="/src/js/holidays.js"></script>
   <script src="/src/js/analytics.js"></script>
+
+  <script src="/src/js/absence.js"></script>
   <script src="/src/js/calendar.js"></script>
 
   <script src="/src/js/install.js"></script>
@@ -158,7 +181,6 @@
   <script>
     (function () {
       function pad2(n) { return String(n).padStart(2, "0"); }
-
       function formatDate(st) { return `${st.year}-${pad2(st.month)}-${pad2(st.day)}`; }
       function formatTime(st) { return `${pad2(st.hour)}:${pad2(st.minute)}:${pad2(st.second)}`; }
 
@@ -190,9 +212,57 @@
       }
 
       function renderCalendar() {
-        if (window.CalendarView) {
-          CalendarView.renderMonth("calendarMount", new Date());
+        if (window.CalendarView) CalendarView.renderMonth("calendarMount", new Date());
+      }
+
+      function renderAbsences() {
+        const tbody = document.getElementById("absTbody");
+        tbody.innerHTML = "";
+
+        const list = AbsenceService.listAbsencesForMonth(new Date());
+        if (!list.length) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td colspan="4" class="muted">Keine</td>`;
+          tbody.appendChild(tr);
+          return;
         }
+
+        list.forEach(a => {
+          const tr = document.createElement("tr");
+
+          const label =
+            a.type === "VACATION" ? "Urlaub" :
+            a.type === "SICK" ? "Krank" :
+            a.type === "WORK_MANUAL" ? "Arbeit (manuell)" : a.type;
+
+          tr.innerHTML = `
+            <td class="mono">${a.date}</td>
+            <td>${label}</td>
+            <td class="${a.auto ? "warn" : "muted"}">${a.auto ? "ja" : "nein"}</td>
+            <td>
+              <button class="btn secondary" data-act="vac">Urlaub</button>
+              <button class="btn secondary" data-act="sick">Krank</button>
+              <button class="btn secondary" data-act="work">Arbeit</button>
+              <button class="btn secondary" data-act="clear">Entfernen</button>
+            </td>
+          `;
+
+          const btns = tr.querySelectorAll("button");
+          btns.forEach(btn => {
+            btn.onclick = () => {
+              const act = btn.getAttribute("data-act");
+              if (act === "vac") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.VACATION);
+              if (act === "sick") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.SICK);
+              if (act === "work") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.WORK_MANUAL);
+              if (act === "clear") AbsenceService.clearAbsence(a.date);
+
+              renderAbsences();
+              renderCalendar();
+            };
+          });
+
+          tbody.appendChild(tr);
+        });
       }
 
       function renderMain() {
@@ -231,11 +301,7 @@
 
         if (stamps.length === 0) {
           const tr = document.createElement("tr");
-          const td = document.createElement("td");
-          td.colSpan = 5;
-          td.className = "muted";
-          td.textContent = "Noch keine Einträge";
-          tr.appendChild(td);
+          tr.innerHTML = `<td colspan="5" class="muted">Noch keine Einträge</td>`;
           tbody.appendChild(tr);
         } else {
           stamps.slice(-30).reverse().forEach(st => {
@@ -245,9 +311,7 @@
               <td>${formatDate(st)}</td>
               <td>${formatTime(st)}</td>
               <td class="mono">${st.iso}</td>
-              <td class="${st.manualRequired ? "warn" : "muted"}">
-                ${st.manualRequired ? "JA" : "nein"}
-              </td>
+              <td class="${st.manualRequired ? "warn" : "muted"}">${st.manualRequired ? "JA" : "nein"}</td>
             `;
             tbody.appendChild(tr);
           });
@@ -255,8 +319,12 @@
       }
 
       function renderAll() {
+        // Auto-Urlaub erzeugen (bis gestern), bevor wir rendern
+        if (window.AbsenceService) AbsenceService.ensureAutoVacationUpToYesterday();
+
         renderAnalysis();
         renderCalendar();
+        renderAbsences();
         renderMain();
       }
 
@@ -267,6 +335,12 @@
 
       document.getElementById("btnRecalc").onclick = () => {
         renderAnalysis();
+        renderCalendar();
+      };
+
+      document.getElementById("btnAbsRefresh").onclick = () => {
+        if (window.AbsenceService) AbsenceService.ensureAutoVacationUpToYesterday();
+        renderAbsences();
         renderCalendar();
       };
 
