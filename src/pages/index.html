@@ -41,6 +41,7 @@
           <div style="margin-top:0.5rem;">
             <div class="label">IST (Stunden)</div>
             <div class="value" id="weekWorked">–</div>
+            <div class="muted small" id="weekManualAdded">–</div>
           </div>
           <div style="margin-top:0.5rem;">
             <div class="label">SOLL (Stunden)</div>
@@ -59,6 +60,7 @@
           <div style="margin-top:0.5rem;">
             <div class="label">IST (Stunden)</div>
             <div class="value" id="monthWorked">–</div>
+            <div class="muted small" id="monthManualAdded">–</div>
           </div>
           <div style="margin-top:0.5rem;">
             <div class="label">SOLL (Stunden)</div>
@@ -71,10 +73,6 @@
           <div class="muted small" style="margin-top:0.5rem;" id="monthFlags">–</div>
         </div>
       </div>
-
-      <p class="muted small" style="margin-top:0.75rem;">
-        SOLL berücksichtigt: Wochenstunden + Arbeitstage + Feiertage + Custom. (Urlaub/Krankheit reduziert SOLL im nächsten Schritt.)
-      </p>
     </section>
 
     <section class="card">
@@ -92,7 +90,7 @@
 
       <p class="muted small">
         Automatisch: Soll-Tage ohne Stempel werden bis gestern als <b>Urlaub (auto)</b> markiert.
-        Du kannst jeden Tag auf <b>Krank</b> umstellen oder als <b>Arbeit (manuell)</b> markieren.
+        Mit <b>Zeit</b> kannst du für den Tag Arbeitszeit nachtragen.
       </p>
 
       <div class="table-wrap">
@@ -107,6 +105,33 @@
           </thead>
           <tbody id="absTbody">
             <tr><td colspan="4" class="muted">Keine</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <h2>Manuelle Nachträge (aktueller Monat)</h2>
+        <div class="row-right">
+          <button class="btn secondary" id="btnManualRefresh" type="button">Aktualisieren</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Datum</th>
+              <th>Start</th>
+              <th>Ende</th>
+              <th>Pause (min)</th>
+              <th>Arbeitszeit (min)</th>
+              <th>Aktionen</th>
+            </tr>
+          </thead>
+          <tbody id="manualTbody">
+            <tr><td colspan="6" class="muted">Keine</td></tr>
           </tbody>
         </table>
       </div>
@@ -163,6 +188,44 @@
 
   </main>
 
+  <!-- Modal: Arbeitszeit nachtragen -->
+  <div id="manualModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal-card">
+      <div class="row">
+        <h3 style="margin:0;">Arbeitszeit nachtragen</h3>
+        <button class="btn secondary" id="btnModalClose" type="button">✕</button>
+      </div>
+
+      <div class="muted small" id="modalDateLabel">–</div>
+
+      <div class="grid2" style="margin-top:0.75rem;">
+        <div>
+          <label class="label" for="mwStart">Start (HH:MM)</label>
+          <input id="mwStart" type="time" style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+        </div>
+        <div>
+          <label class="label" for="mwEnd">Ende (HH:MM)</label>
+          <input id="mwEnd" type="time" style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+        </div>
+      </div>
+
+      <div style="margin-top:0.75rem;">
+        <label class="label" for="mwBreak">Pause (Minuten)</label>
+        <input id="mwBreak" type="number" min="0" step="1" value="0"
+               style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+      </div>
+
+      <div class="muted small" style="margin-top:0.5rem;" id="mwPreview">–</div>
+      <div class="muted small warn" style="margin-top:0.5rem;" id="mwError"></div>
+
+      <div class="row" style="margin-top:0.75rem;">
+        <button class="btn" id="btnMwSave" type="button">Speichern</button>
+        <button class="btn secondary" id="btnMwDelete" type="button">Löschen</button>
+      </div>
+    </div>
+  </div>
+
   <footer class="footer muted">
     <span>Alles lokal im Browser gespeichert.</span>
   </footer>
@@ -174,6 +237,7 @@
   <script src="/src/js/analytics.js"></script>
 
   <script src="/src/js/absence.js"></script>
+  <script src="/src/js/manual_work.js"></script>
   <script src="/src/js/calendar.js"></script>
 
   <script src="/src/js/install.js"></script>
@@ -189,6 +253,116 @@
         if (el) el.textContent = text;
       }
 
+      // ---------- Modal State ----------
+      let currentModalDate = null;
+
+      const modal = document.getElementById("manualModal");
+      const modalBackdrop = document.getElementById("modalBackdrop");
+      const btnModalClose = document.getElementById("btnModalClose");
+      const modalDateLabel = document.getElementById("modalDateLabel");
+      const mwStart = document.getElementById("mwStart");
+      const mwEnd = document.getElementById("mwEnd");
+      const mwBreak = document.getElementById("mwBreak");
+      const mwPreview = document.getElementById("mwPreview");
+      const mwError = document.getElementById("mwError");
+      const btnMwSave = document.getElementById("btnMwSave");
+      const btnMwDelete = document.getElementById("btnMwDelete");
+
+      function openModal(dateStr) {
+        currentModalDate = dateStr;
+        mwError.textContent = "";
+        modalDateLabel.textContent = `Datum: ${dateStr}`;
+
+        const existing = ManualWorkService.getByDate(dateStr);
+        if (existing) {
+          mwStart.value = existing.start || "";
+          mwEnd.value = existing.end || "";
+          mwBreak.value = String(existing.breakMinutes ?? 0);
+        } else {
+          mwStart.value = "";
+          mwEnd.value = "";
+          mwBreak.value = "0";
+        }
+
+        updatePreview();
+
+        modal.classList.remove("hidden");
+        modal.setAttribute("aria-hidden", "false");
+      }
+
+      function closeModal() {
+        modal.classList.add("hidden");
+        modal.setAttribute("aria-hidden", "true");
+        currentModalDate = null;
+      }
+
+      function updatePreview() {
+        mwError.textContent = "";
+        if (!currentModalDate) { mwPreview.textContent = "–"; return; }
+
+        const s = mwStart.value;
+        const e = mwEnd.value;
+        const b = Number(mwBreak.value || 0);
+
+        if (!s || !e) {
+          mwPreview.textContent = "Bitte Start und Ende eintragen.";
+          return;
+        }
+
+        const res = ManualWorkService.upsert(currentModalDate, s, e, b);
+        // upsert speichert sofort — das wollen wir im Preview NICHT.
+        // Deshalb: wir simulieren Preview ohne persist:
+        // -> wir machen hier eine kleine lokale Berechnung stattdessen.
+        // Um es stabil zu halten, rechnen wir hier selbst:
+        // (Einfach: hh:mm -> min)
+        function toMin(t) {
+          const m = String(t).match(/^(\d{1,2}):(\d{2})$/);
+          if (!m) return null;
+          const hh = Number(m[1]), mm = Number(m[2]);
+          if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+          return hh * 60 + mm;
+        }
+        const sm = toMin(s), em = toMin(e);
+        if (sm === null || em === null) { mwPreview.textContent = "Ungültige Zeit."; return; }
+        if (em <= sm) { mwPreview.textContent = "Ende muss nach Start liegen."; return; }
+
+        const worked = Math.max(0, (em - sm) - Math.max(0, b));
+        const hours = (worked / 60).toFixed(2);
+        mwPreview.textContent = `Ergebnis: ${worked} Minuten (= ${hours} Stunden)`;
+      }
+
+      // Preview darf NICHT speichern → daher überschreiben wir die Preview-Logik:
+      // Wir nutzen ManualWorkService.upsert erst bei "Speichern".
+      mwStart.addEventListener("input", updatePreview);
+      mwEnd.addEventListener("input", updatePreview);
+      mwBreak.addEventListener("input", updatePreview);
+
+      modalBackdrop.onclick = closeModal;
+      btnModalClose.onclick = closeModal;
+
+      btnMwSave.onclick = () => {
+        if (!currentModalDate) return;
+        const res = ManualWorkService.upsert(currentModalDate, mwStart.value, mwEnd.value, Number(mwBreak.value || 0));
+        if (!res.ok) {
+          mwError.textContent = res.error;
+          return;
+        }
+
+        // Wenn Zeit nachgetragen wird: Tag als Arbeit (manuell) markieren
+        AbsenceService.setAbsence(currentModalDate, AbsenceService.TYPES.WORK_MANUAL);
+
+        closeModal();
+        renderAll();
+      };
+
+      btnMwDelete.onclick = () => {
+        if (!currentModalDate) return;
+        ManualWorkService.remove(currentModalDate);
+        closeModal();
+        renderAll();
+      };
+
+      // ---------- Rendering ----------
       function renderAnalysis() {
         const summary = Analytics.getSummary();
 
@@ -196,19 +370,25 @@
           `${Analytics.formatDateYYYYMMDD(summary.week.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.week.endExclusive.getTime() - 1))}`;
 
         document.getElementById("weekWorked").textContent = Analytics.formatHours(summary.week.workedHours);
+        document.getElementById("weekManualAdded").textContent =
+          `Manuell hinzugefügt: ${Analytics.formatHours(summary.week.manualHoursAdded)} h`;
+
         document.getElementById("weekTarget").textContent = Analytics.formatHours(summary.week.targetHours);
         document.getElementById("weekDiff").textContent = Analytics.formatSignedDiff(summary.week.diffHours);
         document.getElementById("weekFlags").textContent =
-          `Manuell: ${summary.week.manualCount} • Offene IN: ${summary.week.openCount} • OUT ohne IN: ${summary.week.unmatchedOutCount}`;
+          `Stempel-Hinweise: Manuell: ${summary.week.manualCount} • Offene IN: ${summary.week.openCount} • OUT ohne IN: ${summary.week.unmatchedOutCount}`;
 
         document.getElementById("monthRange").textContent =
           `${Analytics.formatDateYYYYMMDD(summary.month.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.month.endExclusive.getTime() - 1))}`;
 
         document.getElementById("monthWorked").textContent = Analytics.formatHours(summary.month.workedHours);
+        document.getElementById("monthManualAdded").textContent =
+          `Manuell hinzugefügt: ${Analytics.formatHours(summary.month.manualHoursAdded)} h`;
+
         document.getElementById("monthTarget").textContent = Analytics.formatHours(summary.month.targetHours);
         document.getElementById("monthDiff").textContent = Analytics.formatSignedDiff(summary.month.diffHours);
         document.getElementById("monthFlags").textContent =
-          `Manuell: ${summary.month.manualCount} • Offene IN: ${summary.month.openCount} • OUT ohne IN: ${summary.month.unmatchedOutCount}`;
+          `Stempel-Hinweise: Manuell: ${summary.month.manualCount} • Offene IN: ${summary.month.openCount} • OUT ohne IN: ${summary.month.unmatchedOutCount}`;
       }
 
       function renderCalendar() {
@@ -221,25 +401,23 @@
 
         const list = AbsenceService.listAbsencesForMonth(new Date());
         if (!list.length) {
-          const tr = document.createElement("tr");
-          tr.innerHTML = `<td colspan="4" class="muted">Keine</td>`;
-          tbody.appendChild(tr);
+          tbody.innerHTML = `<tr><td colspan="4" class="muted">Keine</td></tr>`;
           return;
         }
 
         list.forEach(a => {
-          const tr = document.createElement("tr");
-
           const label =
             a.type === "VACATION" ? "Urlaub" :
             a.type === "SICK" ? "Krank" :
             a.type === "WORK_MANUAL" ? "Arbeit (manuell)" : a.type;
 
+          const tr = document.createElement("tr");
           tr.innerHTML = `
             <td class="mono">${a.date}</td>
             <td>${label}</td>
             <td class="${a.auto ? "warn" : "muted"}">${a.auto ? "ja" : "nein"}</td>
             <td>
+              <button class="btn secondary" data-act="time">Zeit</button>
               <button class="btn secondary" data-act="vac">Urlaub</button>
               <button class="btn secondary" data-act="sick">Krank</button>
               <button class="btn secondary" data-act="work">Arbeit</button>
@@ -247,10 +425,10 @@
             </td>
           `;
 
-          const btns = tr.querySelectorAll("button");
-          btns.forEach(btn => {
+          tr.querySelectorAll("button").forEach(btn => {
             btn.onclick = () => {
               const act = btn.getAttribute("data-act");
+              if (act === "time") { openModal(a.date); return; }
               if (act === "vac") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.VACATION);
               if (act === "sick") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.SICK);
               if (act === "work") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.WORK_MANUAL);
@@ -258,8 +436,43 @@
 
               renderAbsences();
               renderCalendar();
+              renderAnalysis();
             };
           });
+
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderManualWork() {
+        const tbody = document.getElementById("manualTbody");
+        tbody.innerHTML = "";
+
+        const list = ManualWorkService.listForMonth(new Date());
+        if (!list.length) {
+          tbody.innerHTML = `<tr><td colspan="6" class="muted">Keine</td></tr>`;
+          return;
+        }
+
+        list.forEach(e => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="mono">${e.date}</td>
+            <td>${e.start}</td>
+            <td>${e.end}</td>
+            <td>${e.breakMinutes}</td>
+            <td>${e.minutesWorked}</td>
+            <td>
+              <button class="btn secondary" data-act="edit">Bearbeiten</button>
+              <button class="btn secondary" data-act="del">Löschen</button>
+            </td>
+          `;
+
+          tr.querySelector('[data-act="edit"]').onclick = () => openModal(e.date);
+          tr.querySelector('[data-act="del"]').onclick = () => {
+            ManualWorkService.remove(e.date);
+            renderAll();
+          };
 
           tbody.appendChild(tr);
         });
@@ -300,9 +513,7 @@
         tbody.innerHTML = "";
 
         if (stamps.length === 0) {
-          const tr = document.createElement("tr");
-          tr.innerHTML = `<td colspan="5" class="muted">Noch keine Einträge</td>`;
-          tbody.appendChild(tr);
+          tbody.innerHTML = `<tr><td colspan="5" class="muted">Noch keine Einträge</td></tr>`;
         } else {
           stamps.slice(-30).reverse().forEach(st => {
             const tr = document.createElement("tr");
@@ -319,40 +530,22 @@
       }
 
       function renderAll() {
-        // Auto-Urlaub erzeugen (bis gestern), bevor wir rendern
         if (window.AbsenceService) AbsenceService.ensureAutoVacationUpToYesterday();
 
         renderAnalysis();
         renderCalendar();
         renderAbsences();
+        renderManualWork();
         renderMain();
       }
 
-      document.getElementById("btnRefresh").onclick = () => {
-        renderAll();
-        setHint("Aktualisiert");
-      };
+      document.getElementById("btnRefresh").onclick = () => { renderAll(); setHint("Aktualisiert"); };
+      document.getElementById("btnRecalc").onclick = () => { renderAnalysis(); renderCalendar(); };
+      document.getElementById("btnAbsRefresh").onclick = () => { AbsenceService.ensureAutoVacationUpToYesterday(); renderAbsences(); renderCalendar(); };
+      document.getElementById("btnManualRefresh").onclick = () => { renderManualWork(); renderAnalysis(); };
 
-      document.getElementById("btnRecalc").onclick = () => {
-        renderAnalysis();
-        renderCalendar();
-      };
-
-      document.getElementById("btnAbsRefresh").onclick = () => {
-        if (window.AbsenceService) AbsenceService.ensureAutoVacationUpToYesterday();
-        renderAbsences();
-        renderCalendar();
-      };
-
-      document.getElementById("btnExportCsv").onclick = () => {
-        ExportService.exportStampsCSV({ delimiter: ";" });
-        setHint("CSV exportiert");
-      };
-
-      document.getElementById("btnExportJson").onclick = () => {
-        ExportService.exportAllJSON();
-        setHint("JSON exportiert");
-      };
+      document.getElementById("btnExportCsv").onclick = () => { ExportService.exportStampsCSV({ delimiter: ";" }); setHint("CSV exportiert"); };
+      document.getElementById("btnExportJson").onclick = () => { ExportService.exportAllJSON(); setHint("JSON exportiert"); };
 
       renderAll();
     })();
