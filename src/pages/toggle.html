@@ -5,6 +5,10 @@
   <title>Stempeluhr – Erfassen</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+  <!-- PWA / App-Icons -->
+  <link rel="manifest" href="/public/manifest.json" />
+  <meta name="theme-color" content="#1f2933" />
+
   <link rel="stylesheet" href="/src/css/style.css" />
 </head>
 <body>
@@ -21,7 +25,6 @@
     (function () {
       try {
         const result = window.Clock.toggleStamp();
-
         const statusEl = document.getElementById("status");
 
         if (result.type === "IN") {
@@ -30,12 +33,12 @@
         } else if (result.type === "OUT") {
           statusEl.textContent =
             "Arbeitsende erfasst um " + result.timeString;
-        } else if (result.type === "ERROR") {
+        } else {
           statusEl.textContent =
             "⚠️ Manuelle Prüfung erforderlich";
         }
 
-        // Optional: nach kurzer Zeit zurück zur Übersicht
+        // Nach kurzer Zeit zurück zur Übersicht
         setTimeout(() => {
           window.location.href = "/";
         }, 1500);
@@ -50,4 +53,3 @@
 
 </body>
 </html>
-
