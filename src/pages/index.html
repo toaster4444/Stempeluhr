@@ -5,6 +5,10 @@
   <title>Stempeluhr – Übersicht</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+  <!-- PWA / App-Icons -->
+  <link rel="manifest" href="/public/manifest.json" />
+  <meta name="theme-color" content="#1f2933" />
+
   <link rel="stylesheet" href="/src/css/style.css" />
 </head>
 <body>
@@ -69,18 +73,6 @@
           </tbody>
         </table>
       </div>
-
-      <p class="muted small">
-        Hinweis: Diese Übersicht zeigt Rohdaten. Auswertungen (Woche/Monat, Feiertage, Urlaub/Krankheit) kommen danach.
-      </p>
-    </section>
-
-    <section class="card">
-      <h2>Schnellaktionen</h2>
-      <div class="actions">
-        <a class="btn" href="/toggle">NFC/Tap: Stempeln</a>
-        <a class="btn secondary" href="/settings">Wochenstunden / Feiertage / Urlaub</a>
-      </div>
     </section>
   </main>
 
@@ -97,17 +89,11 @@
       function pad2(n) { return String(n).padStart(2, "0"); }
 
       function formatDate(st) {
-        const y = String(st.year).padStart(4, "0");
-        const m = pad2(st.month);
-        const d = pad2(st.day);
-        return `${y}-${m}-${d}`;
+        return `${st.year}-${pad2(st.month)}-${pad2(st.day)}`;
       }
 
       function formatTime(st) {
-        const hh = pad2(st.hour);
-        const mm = pad2(st.minute);
-        const ss = pad2(st.second);
-        return `${hh}:${mm}:${ss}`;
+        return `${pad2(st.hour)}:${pad2(st.minute)}:${pad2(st.second)}`;
       }
 
       function setHint(text) {
@@ -116,114 +102,64 @@
       }
 
       function render() {
-        const data = window.StorageService.getData();
-        const stamps = Array.isArray(data.stamps) ? data.stamps : [];
-        const last = stamps.length ? stamps[stamps.length - 1] : null;
+        const data = StorageService.getData();
+        const stamps = data.stamps || [];
+        const last = stamps[stamps.length - 1];
 
-        // Status
-        const lastVal = document.getElementById("lastStampValue");
-        const lastMeta = document.getElementById("lastStampMeta");
+        document.getElementById("lastStampValue").textContent =
+          last ? `${last.type} • ${formatDate(last)} ${formatTime(last)}` : "–";
+
+        document.getElementById("lastStampMeta").textContent =
+          last ? `timestamp: ${last.timestamp}` : "Noch keine Stempel vorhanden";
+
         const alerts = document.getElementById("alerts");
-
-        if (!last) {
-          lastVal.textContent = "–";
-          lastMeta.textContent = "Noch keine Stempel vorhanden";
-        } else {
-          lastVal.textContent = `${last.type} • ${formatDate(last)} ${formatTime(last)}`;
-          lastMeta.textContent = `timestamp: ${last.timestamp}`;
-        }
-
-        // Alerts: manuelle Fälle
-        const manual = stamps.filter(s => s && s.manualRequired);
         alerts.innerHTML = "";
+
+        const manual = stamps.filter(s => s.manualRequired);
         if (manual.length === 0) {
-          const div = document.createElement("div");
-          div.className = "muted";
-          div.textContent = "Keine";
-          alerts.appendChild(div);
+          alerts.innerHTML = `<div class="muted">Keine</div>`;
         } else {
           manual.slice(-5).reverse().forEach(s => {
             const div = document.createElement("div");
             div.className = "alert";
-            div.textContent = `⚠️ Manuelle Prüfung: ${formatDate(s)} ${formatTime(s)} (Typ: ${s.type})`;
+            div.textContent =
+              `⚠️ Manuelle Prüfung: ${formatDate(s)} ${formatTime(s)}`;
             alerts.appendChild(div);
           });
         }
 
-        // Tabelle
         const tbody = document.getElementById("stampsTbody");
         tbody.innerHTML = "";
 
-        const rows = stamps.slice(-30).reverse();
-        if (rows.length === 0) {
+        stamps.slice(-30).reverse().forEach(st => {
           const tr = document.createElement("tr");
-          const td = document.createElement("td");
-          td.colSpan = 5;
-          td.className = "muted";
-          td.textContent = "Noch keine Einträge";
-          tr.appendChild(td);
-          tbody.appendChild(tr);
-          return;
-        }
-
-        rows.forEach(st => {
-          const tr = document.createElement("tr");
-
-          const tdType = document.createElement("td");
-          tdType.textContent = st.type || "–";
-          tdType.className = st.manualRequired ? "warn" : "";
-          tr.appendChild(tdType);
-
-          const tdDate = document.createElement("td");
-          tdDate.textContent = st.year ? formatDate(st) : "–";
-          tr.appendChild(tdDate);
-
-          const tdTime = document.createElement("td");
-          tdTime.textContent = (typeof st.hour === "number") ? formatTime(st) : "–";
-          tr.appendChild(tdTime);
-
-          const tdIso = document.createElement("td");
-          tdIso.textContent = st.iso || "–";
-          tdIso.className = "mono";
-          tr.appendChild(tdIso);
-
-          const tdMan = document.createElement("td");
-          tdMan.textContent = st.manualRequired ? "JA" : "nein";
-          tdMan.className = st.manualRequired ? "warn" : "muted";
-          tr.appendChild(tdMan);
-
+          tr.innerHTML = `
+            <td class="${st.manualRequired ? "warn" : ""}">${st.type}</td>
+            <td>${formatDate(st)}</td>
+            <td>${formatTime(st)}</td>
+            <td class="mono">${st.iso}</td>
+            <td class="${st.manualRequired ? "warn" : "muted"}">
+              ${st.manualRequired ? "JA" : "nein"}
+            </td>
+          `;
           tbody.appendChild(tr);
         });
       }
 
-      document.getElementById("btnRefresh").addEventListener("click", () => {
+      document.getElementById("btnRefresh").onclick = () => {
         render();
         setHint("Aktualisiert");
-      });
+      };
 
-      document.getElementById("btnExportCsv").addEventListener("click", () => {
-        try {
-          window.ExportService.exportStampsCSV({ delimiter: ";" });
-          setHint("CSV exportiert");
-        } catch (e) {
-          console.error(e);
-          setHint("Export fehlgeschlagen");
-        }
-      });
+      document.getElementById("btnExportCsv").onclick = () => {
+        ExportService.exportStampsCSV({ delimiter: ";" });
+        setHint("CSV exportiert");
+      };
 
-      document.getElementById("btnExportJson").addEventListener("click", () => {
-        try {
-          window.ExportService.exportAllJSON();
-          setHint("JSON exportiert");
-        } catch (e) {
-          console.error(e);
-          setHint("Export fehlgeschlagen");
-        }
-      });
-
-      if (window.UI && typeof window.UI.init === "function") {
-        window.UI.init();
-      }
+      document.getElementById("btnExportJson").onclick = () => {
+        ExportService.exportAllJSON();
+        setHint("JSON exportiert");
+      };
 
       render();
     })();
