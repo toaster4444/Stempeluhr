@@ -83,7 +83,8 @@
       </div>
 
       <p class="muted small" style="margin-top:0.75rem;">
-        Hinweis: Feiertage/Urlaub/Krankheit werden später in die SOLL-Zeit integriert. Aktuell zählt SOLL anhand Wochenstunden + ausgewählten Arbeitstagen.
+        SOLL berücksichtigt: Wochenstunden + gewählte Arbeitstage + gesetzliche Feiertage (Bundesland) + personalisierte Feiertage (Faktor).
+        Wenn „Feiertage ignorieren“ aktiv ist, werden gesetzliche Feiertage nicht abgezogen.
       </p>
     </section>
 
@@ -147,6 +148,7 @@
   <script src="/src/js/storage.js"></script>
   <script src="/src/js/ui.js"></script>
   <script src="/src/js/export.js"></script>
+  <script src="/src/js/holidays.js"></script>
   <script src="/src/js/analytics.js"></script>
   <script src="/src/js/install.js"></script>
 
@@ -172,7 +174,6 @@
 
         const summary = Analytics.getSummary();
 
-        // Woche
         document.getElementById("weekRange").textContent =
           `${Analytics.formatDateYYYYMMDD(summary.week.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.week.endExclusive.getTime() - 1))}`;
 
@@ -188,7 +189,6 @@
         document.getElementById("weekFlags").textContent =
           `Manuell: ${summary.week.manualCount} • Offene IN: ${summary.week.openCount} • OUT ohne IN: ${summary.week.unmatchedOutCount}`;
 
-        // Monat
         document.getElementById("monthRange").textContent =
           `${Analytics.formatDateYYYYMMDD(summary.month.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.month.endExclusive.getTime() - 1))}`;
 
