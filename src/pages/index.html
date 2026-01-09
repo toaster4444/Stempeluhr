@@ -16,7 +16,7 @@
   <header class="topbar">
     <div>
       <h1>Stempeluhr</h1>
-      <p class="muted" id="subtitle">Lokale Zeiterfassung</p>
+      <p class="muted">Lokale Zeiterfassung</p>
     </div>
 
     <nav class="nav">
@@ -40,51 +40,51 @@
         <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
           <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Diese Woche</h3>
           <div class="muted small" id="weekRange">–</div>
-
           <div style="margin-top:0.5rem;">
             <div class="label">IST (Stunden)</div>
             <div class="value" id="weekWorked">–</div>
           </div>
-
           <div style="margin-top:0.5rem;">
             <div class="label">SOLL (Stunden)</div>
             <div class="value" id="weekTarget">–</div>
           </div>
-
           <div style="margin-top:0.5rem;">
             <div class="label">Differenz</div>
             <div class="value" id="weekDiff">–</div>
           </div>
-
           <div class="muted small" style="margin-top:0.5rem;" id="weekFlags">–</div>
         </div>
 
         <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
           <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Dieser Monat</h3>
           <div class="muted small" id="monthRange">–</div>
-
           <div style="margin-top:0.5rem;">
             <div class="label">IST (Stunden)</div>
             <div class="value" id="monthWorked">–</div>
           </div>
-
           <div style="margin-top:0.5rem;">
             <div class="label">SOLL (Stunden)</div>
             <div class="value" id="monthTarget">–</div>
           </div>
-
           <div style="margin-top:0.5rem;">
             <div class="label">Differenz</div>
             <div class="value" id="monthDiff">–</div>
           </div>
-
           <div class="muted small" style="margin-top:0.5rem;" id="monthFlags">–</div>
         </div>
       </div>
 
       <p class="muted small" style="margin-top:0.75rem;">
-        SOLL berücksichtigt: Wochenstunden + gewählte Arbeitstage + gesetzliche Feiertage (Bundesland) + personalisierte Feiertage (Faktor).
-        Wenn „Feiertage ignorieren“ aktiv ist, werden gesetzliche Feiertage nicht abgezogen.
+        SOLL berücksichtigt: Wochenstunden + Arbeitstage + Feiertage (Bundesland + ggf. lokales Profil) + personalisierte Feiertage.
+      </p>
+    </section>
+
+    <!-- KALENDER -->
+    <section class="card">
+      <h2>Kalender (Feiertage)</h2>
+      <div id="calendarMount"></div>
+      <p class="muted small" style="margin-top:0.75rem;">
+        Legende: „Soll“ = geplanter Arbeitstag. „frei“ = Feiertag/Custom reduziert SOLL.
       </p>
     </section>
 
@@ -146,23 +146,21 @@
   </footer>
 
   <script src="/src/js/storage.js"></script>
-  <script src="/src/js/ui.js"></script>
   <script src="/src/js/export.js"></script>
+
+  <!-- Feiertage müssen vor Analytics/Kalender geladen werden -->
   <script src="/src/js/holidays.js"></script>
   <script src="/src/js/analytics.js"></script>
+  <script src="/src/js/calendar.js"></script>
+
   <script src="/src/js/install.js"></script>
 
   <script>
     (function () {
       function pad2(n) { return String(n).padStart(2, "0"); }
 
-      function formatDate(st) {
-        return `${st.year}-${pad2(st.month)}-${pad2(st.day)}`;
-      }
-
-      function formatTime(st) {
-        return `${pad2(st.hour)}:${pad2(st.minute)}:${pad2(st.second)}`;
-      }
+      function formatDate(st) { return `${st.year}-${pad2(st.month)}-${pad2(st.day)}`; }
+      function formatTime(st) { return `${pad2(st.hour)}:${pad2(st.minute)}:${pad2(st.second)}`; }
 
       function setHint(text) {
         const el = document.getElementById("exportHint");
@@ -170,39 +168,31 @@
       }
 
       function renderAnalysis() {
-        if (!window.Analytics) return;
-
         const summary = Analytics.getSummary();
 
         document.getElementById("weekRange").textContent =
           `${Analytics.formatDateYYYYMMDD(summary.week.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.week.endExclusive.getTime() - 1))}`;
 
-        document.getElementById("weekWorked").textContent =
-          Analytics.formatHours(summary.week.workedHours);
-
-        document.getElementById("weekTarget").textContent =
-          Analytics.formatHours(summary.week.targetHours);
-
-        document.getElementById("weekDiff").textContent =
-          Analytics.formatSignedDiff(summary.week.diffHours);
-
+        document.getElementById("weekWorked").textContent = Analytics.formatHours(summary.week.workedHours);
+        document.getElementById("weekTarget").textContent = Analytics.formatHours(summary.week.targetHours);
+        document.getElementById("weekDiff").textContent = Analytics.formatSignedDiff(summary.week.diffHours);
         document.getElementById("weekFlags").textContent =
           `Manuell: ${summary.week.manualCount} • Offene IN: ${summary.week.openCount} • OUT ohne IN: ${summary.week.unmatchedOutCount}`;
 
         document.getElementById("monthRange").textContent =
           `${Analytics.formatDateYYYYMMDD(summary.month.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.month.endExclusive.getTime() - 1))}`;
 
-        document.getElementById("monthWorked").textContent =
-          Analytics.formatHours(summary.month.workedHours);
-
-        document.getElementById("monthTarget").textContent =
-          Analytics.formatHours(summary.month.targetHours);
-
-        document.getElementById("monthDiff").textContent =
-          Analytics.formatSignedDiff(summary.month.diffHours);
-
+        document.getElementById("monthWorked").textContent = Analytics.formatHours(summary.month.workedHours);
+        document.getElementById("monthTarget").textContent = Analytics.formatHours(summary.month.targetHours);
+        document.getElementById("monthDiff").textContent = Analytics.formatSignedDiff(summary.month.diffHours);
         document.getElementById("monthFlags").textContent =
           `Manuell: ${summary.month.manualCount} • Offene IN: ${summary.month.openCount} • OUT ohne IN: ${summary.month.unmatchedOutCount}`;
+      }
+
+      function renderCalendar() {
+        if (window.CalendarView) {
+          CalendarView.renderMonth("calendarMount", new Date());
+        }
       }
 
       function renderMain() {
@@ -266,6 +256,7 @@
 
       function renderAll() {
         renderAnalysis();
+        renderCalendar();
         renderMain();
       }
 
@@ -276,6 +267,7 @@
 
       document.getElementById("btnRecalc").onclick = () => {
         renderAnalysis();
+        renderCalendar();
       };
 
       document.getElementById("btnExportCsv").onclick = () => {
