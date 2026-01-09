@@ -11,8 +11,11 @@
       stamps: [],
       settings: {},
       absences: [],
-      manualWork: [], // NEU: manuell nachgetragene Arbeitszeiten pro Datum
-      meta: { lastAction: null }
+      manualWork: [],
+      meta: {
+        lastAction: null,
+        cutoffLastCheckedAt: null
+      }
     };
   }
 
@@ -74,6 +77,12 @@
     return data.settings || {};
   }
 
+  function updateMeta(patch) {
+    const data = load();
+    data.meta = { ...(data.meta || {}), ...(patch || {}) };
+    save(data);
+  }
+
   // ----- Absences -----
 
   function getAbsences() {
@@ -98,9 +107,7 @@
     save(data);
   }
 
-  // ----- Manual Work (NEU) -----
-  // Schema:
-  // { date:"YYYY-MM-DD", start:"HH:MM", end:"HH:MM", breakMinutes:30, minutesWorked:xxx, updatedAt:ms }
+  // ----- Manual Work -----
 
   function getManualWork() {
     const data = load();
@@ -124,6 +131,20 @@
     save(data);
   }
 
+  // ----- Stamps update helper (NEU) -----
+  // Wir verwenden timestamp als "ID" (praktisch eindeutig).
+  function updateStampByTimestamp(timestamp, patch) {
+    const data = load();
+    const stamps = Array.isArray(data.stamps) ? data.stamps : [];
+    const idx = stamps.findIndex(s => s && s.timestamp === timestamp);
+    if (idx < 0) return false;
+
+    stamps[idx] = { ...stamps[idx], ...(patch || {}) };
+    data.stamps = stamps;
+    save(data);
+    return true;
+  }
+
   function clearAll() {
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -134,6 +155,7 @@
     getLastStamp,
     updateSettings,
     getSettings,
+    updateMeta,
     clearAll,
 
     // absences
@@ -144,6 +166,9 @@
     // manual work
     getManualWork,
     upsertManualWork,
-    removeManualWork
+    removeManualWork,
+
+    // stamps update
+    updateStampByTimestamp
   };
 })();
