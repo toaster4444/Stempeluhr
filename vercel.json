@@ -1,22 +1,7 @@
 {
-  "version": 2,
-  "routes": [
-    {
-      "src": "^/$",
-      "dest": "/src/pages/index.html"
-    },
-    {
-      "src": "^/toggle$",
-      "dest": "/src/pages/toggle.html"
-    },
-    {
-      "src": "^/settings$",
-      "dest": "/src/pages/settings.html"
-    },
-    {
-      "src": "^/(.*)$",
-      "dest": "/$1"
-    }
+  "rewrites": [
+    { "source": "/", "destination": "/src/pages/index.html" },
+    { "source": "/toggle", "destination": "/src/pages/toggle.html" },
+    { "source": "/settings", "destination": "/src/pages/settings.html" }
   ]
 }
-
