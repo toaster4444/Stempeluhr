@@ -1,4 +1,3 @@
-
 /**
  * storage.js
  * Zentrale lokale Datenspeicherung für die Stempeluhr
@@ -8,27 +7,46 @@
 (function () {
   const STORAGE_KEY = "stempeluhr_data_v1";
 
+  function defaultData() {
+    return {
+      stamps: [],        // Rohdaten: IN/OUT
+      settings: {},      // Einstellungen
+      absences: [],      // NEU: Urlaub/Krankheit/Manuell (pro Datum)
+      meta: {
+        lastAction: null // "IN" | "OUT"
+      }
+    };
+  }
+
+  function migrate(data) {
+    const base = defaultData();
+    if (!data || typeof data !== "object") return base;
+
+    // merge mit Defaults
+    const merged = {
+      ...base,
+      ...data,
+      meta: { ...base.meta, ...(data.meta || {}) }
+    };
+
+    // ensure arrays
+    if (!Array.isArray(merged.stamps)) merged.stamps = [];
+    if (!Array.isArray(merged.absences)) merged.absences = [];
+    if (!merged.settings || typeof merged.settings !== "object") merged.settings = {};
+
+    return merged;
+  }
+
   function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return {
-        stamps: [],        // alle Kommen-/Gehen-Ereignisse (Rohdaten)
-        settings: {},      // Einstellungen (Wochenstunden etc.)
-        meta: {
-          lastAction: null // "IN" | "OUT"
-        }
-      };
-    }
+    if (!raw) return defaultData();
 
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return migrate(parsed);
     } catch (e) {
       console.error("Speicher konnte nicht gelesen werden", e);
-      return {
-        stamps: [],
-        settings: {},
-        meta: { lastAction: null }
-      };
+      return defaultData();
     }
   }
 
@@ -64,17 +82,47 @@
     return data.settings || {};
   }
 
+  // ----- Absences (NEU) -----
+
+  function getAbsences() {
+    const data = load();
+    return Array.isArray(data.absences) ? data.absences : [];
+  }
+
+  function upsertAbsence(record) {
+    const data = load();
+    const abs = Array.isArray(data.absences) ? data.absences : [];
+
+    const idx = abs.findIndex(a => a && a.date === record.date);
+    if (idx >= 0) abs[idx] = record;
+    else abs.push(record);
+
+    data.absences = abs;
+    save(data);
+  }
+
+  function removeAbsence(dateStr) {
+    const data = load();
+    const abs = Array.isArray(data.absences) ? data.absences : [];
+    data.absences = abs.filter(a => a && a.date !== dateStr);
+    save(data);
+  }
+
   function clearAll() {
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  // Öffentliche API
   window.StorageService = {
     getData,
     addStamp,
     getLastStamp,
     updateSettings,
     getSettings,
-    clearAll
+    clearAll,
+
+    // absences
+    getAbsences,
+    upsertAbsence,
+    removeAbsence
   };
 })();
