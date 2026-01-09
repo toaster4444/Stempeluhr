@@ -110,11 +110,12 @@
               <th>Datum</th>
               <th>Status</th>
               <th>Auto</th>
+              <th>⚠ Problem</th>
               <th>Aktionen</th>
             </tr>
           </thead>
           <tbody id="absTbody">
-            <tr><td colspan="4" class="muted">Keine</td></tr>
+            <tr><td colspan="5" class="muted">Keine</td></tr>
           </tbody>
         </table>
       </div>
@@ -264,6 +265,43 @@
         if (el) el.textContent = text;
       }
 
+      // ---------- Problem-Helper ----------
+      // Liefert { hasIssue:boolean, text:string } für ein Datum.
+      function getIssueForDate(dateStr) {
+        const data = StorageService.getData();
+        const stamps = Array.isArray(data.stamps) ? data.stamps : [];
+
+        const reasons = [];
+
+        for (const s of stamps) {
+          if (!s || !s.year) continue;
+          const ds = `${s.year}-${pad2(s.month)}-${pad2(s.day)}`;
+          if (ds !== dateStr) continue;
+
+          if (s.cutoffFlag) reasons.push("Ausstempeln vergessen (03:00)");
+          if (s.manualRequired) reasons.push("Manuelle Prüfung nötig");
+        }
+
+        const last = stamps.length ? stamps[stamps.length - 1] : null;
+        if (last && last.type === "IN" && last.year) {
+          const lastDs = `${last.year}-${pad2(last.month)}-${pad2(last.day)}`;
+          if (lastDs === dateStr) reasons.push("Offener IN ohne OUT");
+        }
+
+        const uniq = Array.from(new Set(reasons));
+        return { hasIssue: uniq.length > 0, text: uniq.join(" • ") };
+      }
+
+      function hasAnyStampOnDate(dateStr) {
+        const data = StorageService.getData();
+        const stamps = Array.isArray(data.stamps) ? data.stamps : [];
+        return stamps.some(s => {
+          if (!s || !s.year) return false;
+          const ds = `${s.year}-${pad2(s.month)}-${pad2(s.day)}`;
+          return ds === dateStr;
+        });
+      }
+
       // ---------- Modal State ----------
       let currentModalDate = null;
 
@@ -347,12 +385,8 @@
       btnMwSave.onclick = () => {
         if (!currentModalDate) return;
         const res = ManualWorkService.upsert(currentModalDate, mwStart.value, mwEnd.value, Number(mwBreak.value || 0));
-        if (!res.ok) {
-          mwError.textContent = res.error;
-          return;
-        }
+        if (!res.ok) { mwError.textContent = res.error; return; }
 
-        // Wenn Zeit nachgetragen wird: Tag als Arbeit (manuell) markieren
         AbsenceService.setAbsence(currentModalDate, AbsenceService.TYPES.WORK_MANUAL);
 
         closeModal();
@@ -365,17 +399,6 @@
         closeModal();
         renderAll();
       };
-
-      // ---------- Helpers ----------
-      function hasAnyStampOnDate(dateStr) {
-        const data = StorageService.getData();
-        const stamps = Array.isArray(data.stamps) ? data.stamps : [];
-        return stamps.some(s => {
-          if (!s || !s.year) return false;
-          const ds = `${s.year}-${pad2(s.month)}-${pad2(s.day)}`;
-          return ds === dateStr;
-        });
-      }
 
       // ---------- Rendering ----------
       function renderAnalysis() {
@@ -420,7 +443,7 @@
 
         const list = AbsenceService.listAbsencesForMonth(new Date());
         if (!list.length) {
-          tbody.innerHTML = `<tr><td colspan="4" class="muted">Keine</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="5" class="muted">Keine</td></tr>`;
           return;
         }
 
@@ -430,11 +453,16 @@
             a.type === "SICK" ? "Krank" :
             a.type === "WORK_MANUAL" ? "Arbeit (manuell)" : a.type;
 
+          const issue = getIssueForDate(a.date);
+
           const tr = document.createElement("tr");
           tr.innerHTML = `
             <td class="mono">${a.date}</td>
             <td>${label}</td>
             <td class="${a.auto ? "warn" : "muted"}">${a.auto ? "ja" : "nein"}</td>
+            <td class="${issue.hasIssue ? "warn" : "muted"}" title="${issue.hasIssue ? issue.text : ""}">
+              ${issue.hasIssue ? `⚠ ${issue.text}` : "–"}
+            </td>
             <td>
               <button class="btn secondary" data-act="time">Zeit</button>
               <button class="btn secondary" data-act="vac">Urlaub</button>
@@ -493,10 +521,7 @@
           `;
 
           tr.querySelector('[data-act="edit"]').onclick = () => openModal(e.date);
-          tr.querySelector('[data-act="del"]').onclick = () => {
-            ManualWorkService.remove(e.date);
-            renderAll();
-          };
+          tr.querySelector('[data-act="del"]').onclick = () => { ManualWorkService.remove(e.date); renderAll(); };
 
           tbody.appendChild(tr);
         });
@@ -515,7 +540,7 @@
           lastStampMeta.textContent = "Noch keine Stempel vorhanden";
         } else {
           lastStampValue.textContent = `${last.type} • ${formatDate(last)} ${formatTime(last)}`;
-          lastStampMeta.textContent = `timestamp: ${last.timestamp}`;
+          lastStampMeta.textContent = `timestamp: ${last.timestamp}${last.manualRequired ? " • ⚠️ manuell" : ""}`;
         }
 
         const alerts = document.getElementById("alerts");
