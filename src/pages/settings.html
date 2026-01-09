@@ -360,11 +360,21 @@
       }
 
       // React to state changes
-      document.getElementById("stateSelect").addEventListener("change", (e) => {
-        const state = e.target.value;
-        const s = getSettings();
-        renderLocalProfileUI(state, s);
-      });
+     document.getElementById("stateSelect").addEventListener("change", (e) => {
+  const state = e.target.value;
+  const s = getSettings();
+
+  // Wenn das neue Bundesland keine lokalen Profile hat, setzen wir localProfile zurück
+  const opts = getLocalProfilesForState(state);
+  const hasProfiles = opts && opts.length > 1;
+
+  if (!hasProfiles && s.localProfile) {
+    saveSettings({ localProfile: "" });
+  }
+
+  renderLocalProfileUI(state, getSettings());
+});
+
 
       // Save: Hours/Percent
       document.getElementById("btnSaveHours").addEventListener("click", () => {
