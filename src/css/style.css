@@ -269,4 +269,106 @@ a {
   display: flex;
   gap: 0.5rem;
 }
+/* =========
+   Kalender
+   ========= */
+
+.cal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.cal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.cal-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.4rem;
+}
+
+.cal-weekdays .cal-wd {
+  background: #f3f4f6;
+  border-radius: 6px;
+  padding: 0.35rem 0.4rem;
+  font-weight: 600;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.cal-cell {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 0.45rem;
+  min-height: 78px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cal-empty {
+  background: transparent;
+  border: none;
+}
+
+.cal-daynum {
+  font-weight: 700;
+}
+
+.cal-meta {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  background: #e5e7eb;
+}
+
+.badge.ghost {
+  background: #f3f4f6;
+  color: #555;
+}
+
+.badge.warn {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.cal-label {
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.cal-workday {
+  border-color: #dbeafe;
+}
+
+.cal-off {
+  background: #fff7ed; /* leichtes Orange */
+  border-color: #fed7aa;
+}
+
+.cal-legal .cal-label:first-of-type {
+  font-weight: 600;
+}
+
+.cal-today {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+}
 
