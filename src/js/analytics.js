@@ -1,6 +1,11 @@
 /**
  * analytics.js
- * Wochen- & Monatsauswertung (IST/SOLL) – IST enthält jetzt auch manuelle Nachträge.
+ * Wochen- & Monatsauswertung (IST/SOLL)
+ *
+ * WICHTIG:
+ * - Manuelle Nachträge überschreiben Stempelzeiten pro Datum (nur für Auswertung).
+ * - Stempel-Rohdaten bleiben erhalten.
+ * - Ignorierte Stempelzeit wird separat ausgewiesen.
  */
 
 (function () {
@@ -180,11 +185,36 @@
     return target;
   }
 
-  function computeStampWorked(stamps, periodStart, periodEndExclusive) {
+  // ---------- Stempel: pro Datum aufteilen ----------
+  function splitSessionByDay(startTs, endTs) {
+    // returns Map(dateStr -> ms)
+    const map = new Map();
+    let cur = new Date(startTs);
+    let end = new Date(endTs);
+
+    while (cur.getTime() < end.getTime()) {
+      const dayStart = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate(), 0, 0, 0, 0).getTime();
+      const dayEnd = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1, 0, 0, 0, 0).getTime();
+
+      const segStart = Math.max(startTs, dayStart);
+      const segEnd = Math.min(endTs, dayEnd);
+
+      if (segEnd > segStart) {
+        const dateStr = ymd(new Date(dayStart));
+        map.set(dateStr, (map.get(dateStr) || 0) + (segEnd - segStart));
+      }
+
+      cur = new Date(dayEnd);
+    }
+
+    return map;
+  }
+
+  function computeStampWorkedByDate(stamps, periodStart, periodEndExclusive) {
     const sorted = sortStamps(stamps);
     const sessions = buildSessions(sorted);
 
-    let workedMs = 0;
+    const dateMs = new Map(); // dateStr -> ms in period
     let manualCount = 0;
     let openCount = 0;
     let unmatchedOutCount = 0;
@@ -195,16 +225,24 @@
       if (sess.unmatched === "OUT_WITHOUT_IN") unmatchedOutCount += 1;
 
       if (typeof sess.startTs === "number" && typeof sess.endTs === "number") {
-        workedMs += overlapMs(sess.startTs, sess.endTs, periodStart.getTime(), periodEndExclusive.getTime());
+        // clamp to period
+        const s = Math.max(sess.startTs, periodStart.getTime());
+        const e = Math.min(sess.endTs, periodEndExclusive.getTime());
+        if (e > s) {
+          const parts = splitSessionByDay(s, e);
+          parts.forEach((ms, dateStr) => {
+            dateMs.set(dateStr, (dateMs.get(dateStr) || 0) + ms);
+          });
+        }
       }
     }
 
-    return { hours: msToHours(workedMs), manualCount, openCount, unmatchedOutCount };
+    return { dateMs, manualCount, openCount, unmatchedOutCount };
   }
 
-  function computeManualWorked(periodStart, periodEndExclusive) {
+  function computeManualWorkedByDate(periodStart, periodEndExclusive) {
     const list = StorageService.getManualWork();
-    let minutes = 0;
+    const map = new Map(); // dateStr -> minutesWorked
 
     for (const e of list) {
       if (!e || !e.date) continue;
@@ -212,11 +250,11 @@
       if (Number.isNaN(d.getTime())) continue;
 
       if (d >= periodStart && d < periodEndExclusive) {
-        minutes += Number(e.minutesWorked || 0);
+        map.set(e.date, Number(e.minutesWorked || 0));
       }
     }
 
-    return minutesToHours(minutes);
+    return map;
   }
 
   function getSummary() {
@@ -237,12 +275,45 @@
     const mStart = startOfMonth(now);
     const mEnd = endOfMonthExclusive(now);
 
-    const weekStamp = computeStampWorked(stamps, wStart, wEnd);
-    const monthStamp = computeStampWorked(stamps, mStart, mEnd);
+    // --- worked stamps per date + flags ---
+    const weekStamp = computeStampWorkedByDate(stamps, wStart, wEnd);
+    const monthStamp = computeStampWorkedByDate(stamps, mStart, mEnd);
 
-    const weekManual = computeManualWorked(wStart, wEnd);
-    const monthManual = computeManualWorked(mStart, mEnd);
+    // --- manual per date ---
+    const weekManualByDate = computeManualWorkedByDate(wStart, wEnd);
+    const monthManualByDate = computeManualWorkedByDate(mStart, mEnd);
 
+    // --- apply override rule ---
+    function sumWithOverride(stampDateMsMap, manualByDateMap) {
+      let stampHoursCounted = 0;
+      let stampHoursIgnored = 0;
+      let manualHoursCounted = 0;
+
+      // sum stamps
+      stampDateMsMap.forEach((ms, dateStr) => {
+        const hasManual = manualByDateMap.has(dateStr);
+        const h = msToHours(ms);
+        if (hasManual) stampHoursIgnored += h;
+        else stampHoursCounted += h;
+      });
+
+      // sum manual
+      manualByDateMap.forEach((minutes, dateStr) => {
+        manualHoursCounted += minutesToHours(minutes);
+      });
+
+      return {
+        workedHours: stampHoursCounted + manualHoursCounted,
+        manualHoursAdded: manualHoursCounted,
+        stampHoursIgnored: stampHoursIgnored,
+        stampHoursCounted: stampHoursCounted
+      };
+    }
+
+    const weekWorked = sumWithOverride(weekStamp.dateMs, weekManualByDate);
+    const monthWorked = sumWithOverride(monthStamp.dateMs, monthManualByDate);
+
+    // targets
     let dailyTarget = null;
     if (weeklyHours !== null && selectedDaysPerWeek > 0) {
       dailyTarget = weeklyHours / selectedDaysPerWeek;
@@ -251,34 +322,37 @@
     const weekTarget = computeTargetHoursForRange(settings, workdays, dailyTarget, wStart, wEnd);
     const monthTarget = computeTargetHoursForRange(settings, workdays, dailyTarget, mStart, mEnd);
 
-    const weekWorked = weekStamp.hours + weekManual;
-    const monthWorked = monthStamp.hours + monthManual;
-
-    const weekDiff = (weekTarget !== null) ? (weekWorked - weekTarget) : null;
-    const monthDiff = (monthTarget !== null) ? (monthWorked - monthTarget) : null;
+    const weekDiff = (weekTarget !== null) ? (weekWorked.workedHours - weekTarget) : null;
+    const monthDiff = (monthTarget !== null) ? (monthWorked.workedHours - monthTarget) : null;
 
     return {
       week: {
         start: wStart,
         endExclusive: wEnd,
-        workedHours: weekWorked,
+        workedHours: weekWorked.workedHours,
         targetHours: weekTarget,
         diffHours: weekDiff,
+
+        manualHoursAdded: weekWorked.manualHoursAdded,
+        stampHoursIgnored: weekWorked.stampHoursIgnored,
+
         manualCount: weekStamp.manualCount,
         openCount: weekStamp.openCount,
-        unmatchedOutCount: weekStamp.unmatchedOutCount,
-        manualHoursAdded: weekManual
+        unmatchedOutCount: weekStamp.unmatchedOutCount
       },
       month: {
         start: mStart,
         endExclusive: mEnd,
-        workedHours: monthWorked,
+        workedHours: monthWorked.workedHours,
         targetHours: monthTarget,
         diffHours: monthDiff,
+
+        manualHoursAdded: monthWorked.manualHoursAdded,
+        stampHoursIgnored: monthWorked.stampHoursIgnored,
+
         manualCount: monthStamp.manualCount,
         openCount: monthStamp.openCount,
-        unmatchedOutCount: monthStamp.unmatchedOutCount,
-        manualHoursAdded: monthManual
+        unmatchedOutCount: monthStamp.unmatchedOutCount
       },
       meta: {
         weeklyHoursSetting: weeklyHours,
