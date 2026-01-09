@@ -410,3 +410,26 @@ a {
   padding: 1rem;
   box-shadow: 0 12px 40px rgba(0,0,0,0.25);
 }
+/* =========
+   Problem-Markierung (rot)
+   ========= */
+
+.badge.danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.danger-text {
+  color: #991b1b;
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.cal-issue {
+  border-color: #fecaca !important;
+  background: #fff1f2;
+}
+
+.cal-cutoff {
+  outline: 2px solid rgba(153, 27, 27, 0.25);
+}
