@@ -1,1 +1,22 @@
+{
+  "version": 2,
+  "routes": [
+    {
+      "src": "^/$",
+      "dest": "/src/pages/index.html"
+    },
+    {
+      "src": "^/toggle$",
+      "dest": "/src/pages/toggle.html"
+    },
+    {
+      "src": "^/settings$",
+      "dest": "/src/pages/settings.html"
+    },
+    {
+      "src": "^/(.*)$",
+      "dest": "/$1"
+    }
+  ]
+}
 
