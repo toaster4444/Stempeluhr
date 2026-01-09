@@ -372,3 +372,14 @@ a {
   outline: 2px solid rgba(37, 99, 235, 0.35);
 }
 
+.badge.info {
+  background: #e0f2fe;
+  color: #075985;
+}
+.cal-partialoff {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+.cal-abs {
+  border-color: #bae6fd;
+}
