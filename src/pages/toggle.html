@@ -2,10 +2,9 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <title>Stempeluhr – Erfassen</title>
+  <title>Stempeluhr – Stempeln</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- PWA / App-Icons -->
   <link rel="manifest" href="/public/manifest.json" />
   <meta name="theme-color" content="#1f2933" />
 
@@ -13,41 +12,117 @@
 </head>
 <body>
 
-  <main class="center">
-    <h1>⏱️ Zeit wird erfasst …</h1>
-    <p id="status">Bitte warten</p>
+  <header class="topbar">
+    <div>
+      <h1>Stempeln</h1>
+      <p class="muted">Tippe zum Kommen/Gehen</p>
+    </div>
+
+    <nav class="nav">
+      <a class="btn secondary" href="/">Übersicht</a>
+      <a class="btn secondary" href="/settings">Einstellungen</a>
+    </nav>
+  </header>
+
+  <main class="container">
+
+    <section class="card">
+      <h2>Nächste Aktion</h2>
+      <div class="value" id="nextType">–</div>
+      <p class="muted small" id="nextHint">–</p>
+
+      <div class="row" style="margin-top:0.75rem;">
+        <button class="btn" id="btnStamp" type="button">Jetzt stempeln</button>
+      </div>
+    </section>
+
+    <section class="card" id="cutoffCard" style="display:none;">
+      <h2 class="warn">⚠️ Zeit fehlt (Ausstempeln vergessen)</h2>
+      <p class="muted" id="cutoffText">–</p>
+      <p class="muted small">
+        Bitte trage für diesen Tag die Arbeitszeit manuell nach. (Stempel-Rohdaten bleiben erhalten.)
+      </p>
+      <div class="row">
+        <a class="btn" id="cutoffLink" href="/">Zur Übersicht (Zeit nachtragen)</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Letzter Stempel</h2>
+      <div class="value" id="lastStamp">–</div>
+      <div class="muted small" id="lastMeta">–</div>
+    </section>
+
   </main>
 
   <script src="/src/js/storage.js"></script>
-  <script src="/src/js/clock.js"></script>
+  <script src="/src/js/cutoff.js"></script>
+  <script src="/src/js/stamp_service.js"></script>
 
   <script>
     (function () {
-      try {
-        const result = window.Clock.toggleStamp();
-        const statusEl = document.getElementById("status");
+      const nextTypeEl = document.getElementById("nextType");
+      const nextHintEl = document.getElementById("nextHint");
+      const btnStamp = document.getElementById("btnStamp");
 
-        if (result.type === "IN") {
-          statusEl.textContent =
-            "Arbeitsbeginn erfasst um " + result.timeString;
-        } else if (result.type === "OUT") {
-          statusEl.textContent =
-            "Arbeitsende erfasst um " + result.timeString;
-        } else {
-          statusEl.textContent =
-            "⚠️ Manuelle Prüfung erforderlich";
-        }
+      const lastStampEl = document.getElementById("lastStamp");
+      const lastMetaEl = document.getElementById("lastMeta");
 
-        // Nach kurzer Zeit zurück zur Übersicht
-        setTimeout(() => {
-          window.location.href = "/";
-        }, 1500);
+      const cutoffCard = document.getElementById("cutoffCard");
+      const cutoffText = document.getElementById("cutoffText");
+      const cutoffLink = document.getElementById("cutoffLink");
 
-      } catch (e) {
-        document.getElementById("status").textContent =
-          "Fehler bei der Zeiterfassung";
-        console.error(e);
+      function pad2(n) { return String(n).padStart(2, "0"); }
+      function fmtStamp(s) {
+        if (!s) return "–";
+        const date = `${s.year}-${pad2(s.month)}-${pad2(s.day)}`;
+        const time = `${pad2(s.hour)}:${pad2(s.minute)}:${pad2(s.second)}`;
+        return `${s.type} • ${date} ${time}`;
       }
+
+      function refreshUI() {
+        const data = StorageService.getData();
+        const last = (data.stamps && data.stamps.length) ? data.stamps[data.stamps.length - 1] : null;
+
+        lastStampEl.textContent = fmtStamp(last);
+        lastMetaEl.textContent = last ? `timestamp: ${last.timestamp}${last.manualRequired ? " • ⚠️ manuell" : ""}` : "–";
+
+        const next = StampService.decideNextType({ cutoffHour: 3 });
+        nextTypeEl.textContent = next;
+        nextHintEl.textContent = (next === "IN")
+          ? "Nächster Tap: Kommen"
+          : "Nächster Tap: Gehen";
+      }
+
+      function runCutoff() {
+        const res = CutoffService.runCutoffCheck({ cutoffHour: 3 });
+
+        if (res.flagged) {
+          cutoffCard.style.display = "block";
+          cutoffText.textContent = `Betroffenes Datum: ${res.dateStr} • ${res.reason}`;
+          // Link zur Übersicht (dort kannst du per „Zeit“ nachtragen)
+          cutoffLink.href = "/";
+        } else {
+          cutoffCard.style.display = "none";
+        }
+      }
+
+      function doStamp() {
+        // Vor jedem Stempeln nochmal Cutoff prüfen (damit der nächste Tap IN bleibt)
+        runCutoff();
+
+        const type = StampService.decideNextType({ cutoffHour: 3 });
+        const st = StampService.addStampNow(type);
+
+        // UI aktualisieren
+        refreshUI();
+      }
+
+      btnStamp.addEventListener("click", doStamp);
+
+      // Beim Laden:
+      runCutoff();
+      refreshUI();
     })();
   </script>
 
