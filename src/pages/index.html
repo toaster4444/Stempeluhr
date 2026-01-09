@@ -26,6 +26,68 @@
   </header>
 
   <main class="container">
+
+    <!-- AUSWERTUNG -->
+    <section class="card">
+      <div class="row">
+        <h2>Auswertung</h2>
+        <div class="row-right">
+          <button class="btn secondary" id="btnRecalc" type="button">Neu berechnen</button>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
+          <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Diese Woche</h3>
+          <div class="muted small" id="weekRange">–</div>
+
+          <div style="margin-top:0.5rem;">
+            <div class="label">IST (Stunden)</div>
+            <div class="value" id="weekWorked">–</div>
+          </div>
+
+          <div style="margin-top:0.5rem;">
+            <div class="label">SOLL (Stunden)</div>
+            <div class="value" id="weekTarget">–</div>
+          </div>
+
+          <div style="margin-top:0.5rem;">
+            <div class="label">Differenz</div>
+            <div class="value" id="weekDiff">–</div>
+          </div>
+
+          <div class="muted small" style="margin-top:0.5rem;" id="weekFlags">–</div>
+        </div>
+
+        <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
+          <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Dieser Monat</h3>
+          <div class="muted small" id="monthRange">–</div>
+
+          <div style="margin-top:0.5rem;">
+            <div class="label">IST (Stunden)</div>
+            <div class="value" id="monthWorked">–</div>
+          </div>
+
+          <div style="margin-top:0.5rem;">
+            <div class="label">SOLL (Stunden)</div>
+            <div class="value" id="monthTarget">–</div>
+          </div>
+
+          <div style="margin-top:0.5rem;">
+            <div class="label">Differenz</div>
+            <div class="value" id="monthDiff">–</div>
+          </div>
+
+          <div class="muted small" style="margin-top:0.5rem;" id="monthFlags">–</div>
+        </div>
+      </div>
+
+      <p class="muted small" style="margin-top:0.75rem;">
+        Hinweis: Feiertage/Urlaub/Krankheit werden später in die SOLL-Zeit integriert. Aktuell zählt SOLL anhand Wochenstunden + ausgewählten Arbeitstagen.
+      </p>
+    </section>
+
+    <!-- STATUS -->
     <section class="card">
       <h2>Status</h2>
       <div class="grid2">
@@ -43,6 +105,7 @@
       </div>
     </section>
 
+    <!-- ROHDATEN -->
     <section class="card">
       <div class="row">
         <h2>Rohdaten (letzte 30)</h2>
@@ -74,6 +137,7 @@
         </table>
       </div>
     </section>
+
   </main>
 
   <footer class="footer muted">
@@ -83,6 +147,8 @@
   <script src="/src/js/storage.js"></script>
   <script src="/src/js/ui.js"></script>
   <script src="/src/js/export.js"></script>
+  <script src="/src/js/analytics.js"></script>
+  <script src="/src/js/install.js"></script>
 
   <script>
     (function () {
@@ -101,29 +167,71 @@
         if (el) el.textContent = text;
       }
 
-      function render() {
+      function renderAnalysis() {
+        if (!window.Analytics) return;
+
+        const summary = Analytics.getSummary();
+
+        // Woche
+        document.getElementById("weekRange").textContent =
+          `${Analytics.formatDateYYYYMMDD(summary.week.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.week.endExclusive.getTime() - 1))}`;
+
+        document.getElementById("weekWorked").textContent =
+          Analytics.formatHours(summary.week.workedHours);
+
+        document.getElementById("weekTarget").textContent =
+          Analytics.formatHours(summary.week.targetHours);
+
+        document.getElementById("weekDiff").textContent =
+          Analytics.formatSignedDiff(summary.week.diffHours);
+
+        document.getElementById("weekFlags").textContent =
+          `Manuell: ${summary.week.manualCount} • Offene IN: ${summary.week.openCount} • OUT ohne IN: ${summary.week.unmatchedOutCount}`;
+
+        // Monat
+        document.getElementById("monthRange").textContent =
+          `${Analytics.formatDateYYYYMMDD(summary.month.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.month.endExclusive.getTime() - 1))}`;
+
+        document.getElementById("monthWorked").textContent =
+          Analytics.formatHours(summary.month.workedHours);
+
+        document.getElementById("monthTarget").textContent =
+          Analytics.formatHours(summary.month.targetHours);
+
+        document.getElementById("monthDiff").textContent =
+          Analytics.formatSignedDiff(summary.month.diffHours);
+
+        document.getElementById("monthFlags").textContent =
+          `Manuell: ${summary.month.manualCount} • Offene IN: ${summary.month.openCount} • OUT ohne IN: ${summary.month.unmatchedOutCount}`;
+      }
+
+      function renderMain() {
         const data = StorageService.getData();
         const stamps = data.stamps || [];
         const last = stamps[stamps.length - 1];
 
-        document.getElementById("lastStampValue").textContent =
-          last ? `${last.type} • ${formatDate(last)} ${formatTime(last)}` : "–";
+        const lastStampValue = document.getElementById("lastStampValue");
+        const lastStampMeta = document.getElementById("lastStampMeta");
 
-        document.getElementById("lastStampMeta").textContent =
-          last ? `timestamp: ${last.timestamp}` : "Noch keine Stempel vorhanden";
+        if (!last) {
+          lastStampValue.textContent = "–";
+          lastStampMeta.textContent = "Noch keine Stempel vorhanden";
+        } else {
+          lastStampValue.textContent = `${last.type} • ${formatDate(last)} ${formatTime(last)}`;
+          lastStampMeta.textContent = `timestamp: ${last.timestamp}`;
+        }
 
         const alerts = document.getElementById("alerts");
         alerts.innerHTML = "";
 
-        const manual = stamps.filter(s => s.manualRequired);
+        const manual = stamps.filter(s => s && s.manualRequired);
         if (manual.length === 0) {
           alerts.innerHTML = `<div class="muted">Keine</div>`;
         } else {
           manual.slice(-5).reverse().forEach(s => {
             const div = document.createElement("div");
             div.className = "alert";
-            div.textContent =
-              `⚠️ Manuelle Prüfung: ${formatDate(s)} ${formatTime(s)}`;
+            div.textContent = `⚠️ Manuelle Prüfung: ${formatDate(s)} ${formatTime(s)}`;
             alerts.appendChild(div);
           });
         }
@@ -131,24 +239,43 @@
         const tbody = document.getElementById("stampsTbody");
         tbody.innerHTML = "";
 
-        stamps.slice(-30).reverse().forEach(st => {
+        if (stamps.length === 0) {
           const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td class="${st.manualRequired ? "warn" : ""}">${st.type}</td>
-            <td>${formatDate(st)}</td>
-            <td>${formatTime(st)}</td>
-            <td class="mono">${st.iso}</td>
-            <td class="${st.manualRequired ? "warn" : "muted"}">
-              ${st.manualRequired ? "JA" : "nein"}
-            </td>
-          `;
+          const td = document.createElement("td");
+          td.colSpan = 5;
+          td.className = "muted";
+          td.textContent = "Noch keine Einträge";
+          tr.appendChild(td);
           tbody.appendChild(tr);
-        });
+        } else {
+          stamps.slice(-30).reverse().forEach(st => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td class="${st.manualRequired ? "warn" : ""}">${st.type}</td>
+              <td>${formatDate(st)}</td>
+              <td>${formatTime(st)}</td>
+              <td class="mono">${st.iso}</td>
+              <td class="${st.manualRequired ? "warn" : "muted"}">
+                ${st.manualRequired ? "JA" : "nein"}
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      }
+
+      function renderAll() {
+        renderAnalysis();
+        renderMain();
       }
 
       document.getElementById("btnRefresh").onclick = () => {
-        render();
+        renderAll();
         setHint("Aktualisiert");
+      };
+
+      document.getElementById("btnRecalc").onclick = () => {
+        renderAnalysis();
       };
 
       document.getElementById("btnExportCsv").onclick = () => {
@@ -161,11 +288,9 @@
         setHint("JSON exportiert");
       };
 
-      render();
+      renderAll();
     })();
   </script>
-
-  <script src="/src/js/install.js"></script>
 
 </body>
 </html>
