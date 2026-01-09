@@ -1,10 +1,6 @@
 /**
  * analytics.js
- * Wochen- & Monatsauswertung aus Rohdaten (stamps).
- * - rein lokal
- * - berechnet IST-Zeit aus IN/OUT-Paaren
- * - SOLL-Zeit aus Einstellungen (weeklyHours + workdays)
- * - Feiertage (je Bundesland) + Custom-Feiertage (Faktor) fließen in SOLL ein
+ * Wochen- & Monatsauswertung (IST/SOLL) – mit Feiertagen + Custom-Feiertagen
  */
 
 (function () {
@@ -65,19 +61,14 @@
     let openIn = null;
 
     for (const st of stampsSorted) {
-      if (st.type === "IN") {
-        openIn = st; // überschreibt ggf. vorheriges offenes IN
-        continue;
-      }
+      if (st.type === "IN") { openIn = st; continue; }
 
       if (st.type === "OUT") {
         if (openIn && typeof openIn.timestamp === "number" && st.timestamp >= openIn.timestamp) {
           sessions.push({
             startTs: openIn.timestamp,
             endTs: st.timestamp,
-            manualRequired: !!(openIn.manualRequired || st.manualRequired),
-            inStamp: openIn,
-            outStamp: st
+            manualRequired: !!(openIn.manualRequired || st.manualRequired)
           });
           openIn = null;
         } else {
@@ -85,8 +76,7 @@
             startTs: null,
             endTs: st.timestamp,
             manualRequired: true,
-            unmatched: "OUT_WITHOUT_IN",
-            outStamp: st
+            unmatched: "OUT_WITHOUT_IN"
           });
         }
       }
@@ -97,8 +87,7 @@
         startTs: openIn.timestamp,
         endTs: null,
         manualRequired: true,
-        unmatched: "IN_WITHOUT_OUT",
-        inStamp: openIn
+        unmatched: "IN_WITHOUT_OUT"
       });
     }
 
@@ -111,9 +100,7 @@
     return Math.max(0, end - start);
   }
 
-  function msToHours(ms) {
-    return ms / 3600000;
-  }
+  function msToHours(ms) { return ms / 3600000; }
 
   function formatHours(hours) {
     if (hours === null || hours === undefined || Number.isNaN(hours)) return "–";
@@ -159,21 +146,12 @@
     return Math.min(1, f);
   }
 
-  function legalHolidayFactorForDate(settings, dateObj) {
-    const ignore = !!settings.ignoreHolidays;
-    if (ignore) return 0;
-
-    const state = settings.state || "";
-    if (!window.HolidaysService) return 0;
-
-    return HolidaysService.isHoliday(state, dateObj) ? 1 : 0;
+  function legalHolidayOffFactor(settings, dateObj) {
+    if (!window.HolidaysService || !HolidaysService.getHolidayInfo) return 0;
+    const info = HolidaysService.getHolidayInfo(settings, dateObj);
+    return info.offFactor || 0;
   }
 
-  /**
-   * SOLL-Stunden über Zeitraum: sum(dailyTarget * requiredFraction) über alle Soll-Arbeitstage
-   * requiredFraction = 1 - offFraction
-   * offFraction = max(gesetzl. Feiertag (0/1), customFactor (0..1))
-   */
   function computeTargetHoursForRange(settings, workdays, dailyTarget, start, endExclusive) {
     if (dailyTarget === null || dailyTarget === undefined) return null;
 
@@ -186,12 +164,11 @@
       const key = weekdayKey(d);
       if (workdays[key]) {
         const dateStr = ymd(d);
-
-        const legalOff = legalHolidayFactorForDate(settings, d);     // 0 oder 1
+        const legalOff = legalHolidayOffFactor(settings, d);          // 0 oder 1
         const customOff = customHolidayFactorForDate(settings, dateStr); // 0..1
 
-        const offFraction = Math.max(legalOff, customOff);
-        const requiredFraction = 1 - offFraction;
+        const offFactor = Math.max(legalOff, customOff);
+        const requiredFraction = 1 - offFactor;
 
         target += dailyTarget * requiredFraction;
       }
@@ -226,12 +203,7 @@
       }
     }
 
-    return {
-      workedHours: msToHours(workedMs),
-      manualCount,
-      openCount,
-      unmatchedOutCount
-    };
+    return { workedHours: msToHours(workedMs), manualCount, openCount, unmatchedOutCount };
   }
 
   function getSummary() {
@@ -267,41 +239,16 @@
     const monthDiff = (monthTarget !== null) ? (monthWorked.workedHours - monthTarget) : null;
 
     return {
-      week: {
-        start: wStart,
-        endExclusive: wEnd,
-        workedHours: weekWorked.workedHours,
-        targetHours: weekTarget,
-        diffHours: weekDiff,
-        manualCount: weekWorked.manualCount,
-        openCount: weekWorked.openCount,
-        unmatchedOutCount: weekWorked.unmatchedOutCount
-      },
-      month: {
-        start: mStart,
-        endExclusive: mEnd,
-        workedHours: monthWorked.workedHours,
-        targetHours: monthTarget,
-        diffHours: monthDiff,
-        manualCount: monthWorked.manualCount,
-        openCount: monthWorked.openCount,
-        unmatchedOutCount: monthWorked.unmatchedOutCount
-      },
-      meta: {
-        weeklyHoursSetting: weeklyHours,
-        selectedWorkdaysPerWeek: selectedDaysPerWeek
-      }
+      week: { start: wStart, endExclusive: wEnd, workedHours: weekWorked.workedHours, targetHours: weekTarget, diffHours: weekDiff, ...weekWorked },
+      month: { start: mStart, endExclusive: mEnd, workedHours: monthWorked.workedHours, targetHours: monthTarget, diffHours: monthDiff, ...monthWorked },
+      meta: { weeklyHoursSetting: weeklyHours, selectedWorkdaysPerWeek: selectedDaysPerWeek }
     };
-  }
-
-  function formatDateYYYYMMDD(d) {
-    return ymd(d);
   }
 
   window.Analytics = {
     getSummary,
     formatHours,
     formatSignedDiff,
-    formatDateYYYYMMDD
+    formatDateYYYYMMDD: (d) => ymd(d)
   };
 })();
