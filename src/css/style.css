@@ -383,3 +383,30 @@ a {
 .cal-abs {
   border-color: #bae6fd;
 }
+/* =========
+   Modal (manuelles Nachtragen)
+   ========= */
+
+.modal.hidden { display: none; }
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+}
+
+.modal-card {
+  position: relative;
+  margin: 10vh auto 0;
+  max-width: 520px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+}
