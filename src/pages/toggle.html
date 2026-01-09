@@ -1,1 +1,53 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stempeluhr – Erfassen</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="stylesheet" href="/src/css/style.css" />
+</head>
+<body>
+
+  <main class="center">
+    <h1>⏱️ Zeit wird erfasst …</h1>
+    <p id="status">Bitte warten</p>
+  </main>
+
+  <script src="/src/js/storage.js"></script>
+  <script src="/src/js/clock.js"></script>
+
+  <script>
+    (function () {
+      try {
+        const result = window.Clock.toggleStamp();
+
+        const statusEl = document.getElementById("status");
+
+        if (result.type === "IN") {
+          statusEl.textContent =
+            "Arbeitsbeginn erfasst um " + result.timeString;
+        } else if (result.type === "OUT") {
+          statusEl.textContent =
+            "Arbeitsende erfasst um " + result.timeString;
+        } else if (result.type === "ERROR") {
+          statusEl.textContent =
+            "⚠️ Manuelle Prüfung erforderlich";
+        }
+
+        // Optional: nach kurzer Zeit zurück zur Übersicht
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 1500);
+
+      } catch (e) {
+        document.getElementById("status").textContent =
+          "Fehler bei der Zeiterfassung";
+        console.error(e);
+      }
+    })();
+  </script>
+
+</body>
+</html>
 
