@@ -38,38 +38,48 @@
         <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
           <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Diese Woche</h3>
           <div class="muted small" id="weekRange">–</div>
+
           <div style="margin-top:0.5rem;">
             <div class="label">IST (Stunden)</div>
             <div class="value" id="weekWorked">–</div>
             <div class="muted small" id="weekManualAdded">–</div>
+            <div class="muted small" id="weekStampIgnored">–</div>
           </div>
+
           <div style="margin-top:0.5rem;">
             <div class="label">SOLL (Stunden)</div>
             <div class="value" id="weekTarget">–</div>
           </div>
+
           <div style="margin-top:0.5rem;">
             <div class="label">Differenz</div>
             <div class="value" id="weekDiff">–</div>
           </div>
+
           <div class="muted small" style="margin-top:0.5rem;" id="weekFlags">–</div>
         </div>
 
         <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
           <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Dieser Monat</h3>
           <div class="muted small" id="monthRange">–</div>
+
           <div style="margin-top:0.5rem;">
             <div class="label">IST (Stunden)</div>
             <div class="value" id="monthWorked">–</div>
             <div class="muted small" id="monthManualAdded">–</div>
+            <div class="muted small" id="monthStampIgnored">–</div>
           </div>
+
           <div style="margin-top:0.5rem;">
             <div class="label">SOLL (Stunden)</div>
             <div class="value" id="monthTarget">–</div>
           </div>
+
           <div style="margin-top:0.5rem;">
             <div class="label">Differenz</div>
             <div class="value" id="monthDiff">–</div>
           </div>
+
           <div class="muted small" style="margin-top:0.5rem;" id="monthFlags">–</div>
         </div>
       </div>
@@ -90,7 +100,7 @@
 
       <p class="muted small">
         Automatisch: Soll-Tage ohne Stempel werden bis gestern als <b>Urlaub (auto)</b> markiert.
-        Mit <b>Zeit</b> kannst du für den Tag Arbeitszeit nachtragen.
+        Mit <b>Zeit</b> kannst du für den Tag Arbeitszeit nachtragen (überschreibt Stempelzeit für diesen Tag).
       </p>
 
       <div class="table-wrap">
@@ -127,11 +137,12 @@
               <th>Ende</th>
               <th>Pause (min)</th>
               <th>Arbeitszeit (min)</th>
+              <th>Hinweis</th>
               <th>Aktionen</th>
             </tr>
           </thead>
           <tbody id="manualTbody">
-            <tr><td colspan="6" class="muted">Keine</td></tr>
+            <tr><td colspan="7" class="muted">Keine</td></tr>
           </tbody>
         </table>
       </div>
@@ -309,12 +320,6 @@
           return;
         }
 
-        const res = ManualWorkService.upsert(currentModalDate, s, e, b);
-        // upsert speichert sofort — das wollen wir im Preview NICHT.
-        // Deshalb: wir simulieren Preview ohne persist:
-        // -> wir machen hier eine kleine lokale Berechnung stattdessen.
-        // Um es stabil zu halten, rechnen wir hier selbst:
-        // (Einfach: hh:mm -> min)
         function toMin(t) {
           const m = String(t).match(/^(\d{1,2}):(\d{2})$/);
           if (!m) return null;
@@ -322,6 +327,7 @@
           if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
           return hh * 60 + mm;
         }
+
         const sm = toMin(s), em = toMin(e);
         if (sm === null || em === null) { mwPreview.textContent = "Ungültige Zeit."; return; }
         if (em <= sm) { mwPreview.textContent = "Ende muss nach Start liegen."; return; }
@@ -331,8 +337,6 @@
         mwPreview.textContent = `Ergebnis: ${worked} Minuten (= ${hours} Stunden)`;
       }
 
-      // Preview darf NICHT speichern → daher überschreiben wir die Preview-Logik:
-      // Wir nutzen ManualWorkService.upsert erst bei "Speichern".
       mwStart.addEventListener("input", updatePreview);
       mwEnd.addEventListener("input", updatePreview);
       mwBreak.addEventListener("input", updatePreview);
@@ -362,6 +366,17 @@
         renderAll();
       };
 
+      // ---------- Helpers ----------
+      function hasAnyStampOnDate(dateStr) {
+        const data = StorageService.getData();
+        const stamps = Array.isArray(data.stamps) ? data.stamps : [];
+        return stamps.some(s => {
+          if (!s || !s.year) return false;
+          const ds = `${s.year}-${pad2(s.month)}-${pad2(s.day)}`;
+          return ds === dateStr;
+        });
+      }
+
       // ---------- Rendering ----------
       function renderAnalysis() {
         const summary = Analytics.getSummary();
@@ -371,7 +386,9 @@
 
         document.getElementById("weekWorked").textContent = Analytics.formatHours(summary.week.workedHours);
         document.getElementById("weekManualAdded").textContent =
-          `Manuell hinzugefügt: ${Analytics.formatHours(summary.week.manualHoursAdded)} h`;
+          `Manuell gezählt: ${Analytics.formatHours(summary.week.manualHoursAdded)} h`;
+        document.getElementById("weekStampIgnored").textContent =
+          `Stempel ignoriert (wegen manuell): ${Analytics.formatHours(summary.week.stampHoursIgnored)} h`;
 
         document.getElementById("weekTarget").textContent = Analytics.formatHours(summary.week.targetHours);
         document.getElementById("weekDiff").textContent = Analytics.formatSignedDiff(summary.week.diffHours);
@@ -383,7 +400,9 @@
 
         document.getElementById("monthWorked").textContent = Analytics.formatHours(summary.month.workedHours);
         document.getElementById("monthManualAdded").textContent =
-          `Manuell hinzugefügt: ${Analytics.formatHours(summary.month.manualHoursAdded)} h`;
+          `Manuell gezählt: ${Analytics.formatHours(summary.month.manualHoursAdded)} h`;
+        document.getElementById("monthStampIgnored").textContent =
+          `Stempel ignoriert (wegen manuell): ${Analytics.formatHours(summary.month.stampHoursIgnored)} h`;
 
         document.getElementById("monthTarget").textContent = Analytics.formatHours(summary.month.targetHours);
         document.getElementById("monthDiff").textContent = Analytics.formatSignedDiff(summary.month.diffHours);
@@ -450,11 +469,15 @@
 
         const list = ManualWorkService.listForMonth(new Date());
         if (!list.length) {
-          tbody.innerHTML = `<tr><td colspan="6" class="muted">Keine</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7" class="muted">Keine</td></tr>`;
           return;
         }
 
         list.forEach(e => {
+          const stampHint = hasAnyStampOnDate(e.date)
+            ? "Stempel vorhanden (ignoriert in Auswertung)"
+            : "–";
+
           const tr = document.createElement("tr");
           tr.innerHTML = `
             <td class="mono">${e.date}</td>
@@ -462,6 +485,7 @@
             <td>${e.end}</td>
             <td>${e.breakMinutes}</td>
             <td>${e.minutesWorked}</td>
+            <td class="${stampHint !== "–" ? "warn" : "muted"}">${stampHint}</td>
             <td>
               <button class="btn secondary" data-act="edit">Bearbeiten</button>
               <button class="btn secondary" data-act="del">Löschen</button>
@@ -531,7 +555,6 @@
 
       function renderAll() {
         if (window.AbsenceService) AbsenceService.ensureAutoVacationUpToYesterday();
-
         renderAnalysis();
         renderCalendar();
         renderAbsences();
