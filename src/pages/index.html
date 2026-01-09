@@ -47,6 +47,12 @@
         </div>
       </div>
 
+      <div class="actions" style="margin: 0.5rem 0 0.75rem;">
+        <button class="btn" id="btnExportCsv" type="button">Export (Excel/CSV)</button>
+        <button class="btn secondary" id="btnExportJson" type="button">Backup (JSON)</button>
+        <span class="muted small" id="exportHint">–</span>
+      </div>
+
       <div class="table-wrap">
         <table class="table">
           <thead>
@@ -84,21 +90,29 @@
 
   <script src="/src/js/storage.js"></script>
   <script src="/src/js/ui.js"></script>
+  <script src="/src/js/export.js"></script>
 
   <script>
     (function () {
+      function pad2(n) { return String(n).padStart(2, "0"); }
+
       function formatDate(st) {
         const y = String(st.year).padStart(4, "0");
-        const m = String(st.month).padStart(2, "0");
-        const d = String(st.day).padStart(2, "0");
+        const m = pad2(st.month);
+        const d = pad2(st.day);
         return `${y}-${m}-${d}`;
       }
 
       function formatTime(st) {
-        const hh = String(st.hour).padStart(2, "0");
-        const mm = String(st.minute).padStart(2, "0");
-        const ss = String(st.second).padStart(2, "0");
+        const hh = pad2(st.hour);
+        const mm = pad2(st.minute);
+        const ss = pad2(st.second);
         return `${hh}:${mm}:${ss}`;
+      }
+
+      function setHint(text) {
+        const el = document.getElementById("exportHint");
+        if (el) el.textContent = text;
       }
 
       function render() {
@@ -182,9 +196,31 @@
         });
       }
 
-      document.getElementById("btnRefresh").addEventListener("click", render);
+      document.getElementById("btnRefresh").addEventListener("click", () => {
+        render();
+        setHint("Aktualisiert");
+      });
 
-      // UI init (placeholder)
+      document.getElementById("btnExportCsv").addEventListener("click", () => {
+        try {
+          window.ExportService.exportStampsCSV({ delimiter: ";" });
+          setHint("CSV exportiert");
+        } catch (e) {
+          console.error(e);
+          setHint("Export fehlgeschlagen");
+        }
+      });
+
+      document.getElementById("btnExportJson").addEventListener("click", () => {
+        try {
+          window.ExportService.exportAllJSON();
+          setHint("JSON exportiert");
+        } catch (e) {
+          console.error(e);
+          setHint("Export fehlgeschlagen");
+        }
+      });
+
       if (window.UI && typeof window.UI.init === "function") {
         window.UI.init();
       }
@@ -195,4 +231,3 @@
 
 </body>
 </html>
-
