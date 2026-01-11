@@ -8,8 +8,40 @@
   let deferredPrompt = null;
   const dismissKey = "installBannerDismissed";
 
+  function isIos() {
+    return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+  }
+
   function isStandalone() {
     return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  }
+
+  async function setBannerIcon(banner) {
+    if (!banner) return;
+    const icon = banner.querySelector(".install-icon");
+    if (!icon) return;
+
+    try {
+      const manifestLink = document.querySelector('link[rel="manifest"]');
+      if (!manifestLink) return;
+      const response = await fetch(manifestLink.href);
+      if (!response.ok) return;
+      const manifest = await response.json();
+      if (!manifest.icons || manifest.icons.length === 0) return;
+
+      const sortedIcons = [...manifest.icons].sort((a, b) => {
+        const sizeA = parseInt(String(a.sizes).split("x")[0], 10) || 0;
+        const sizeB = parseInt(String(b.sizes).split("x")[0], 10) || 0;
+        return sizeB - sizeA;
+      });
+
+      const bestIcon = sortedIcons[0];
+      if (bestIcon && bestIcon.src) {
+        icon.src = bestIcon.src;
+      }
+    } catch (error) {
+      // Fallback: default icon remains
+    }
   }
 
   function updateBannerState(banner) {
@@ -17,15 +49,25 @@
     const installButton = banner.querySelector("#btnInstallApp");
     const status = banner.querySelector("#installStatus");
     const available = !!deferredPrompt;
+    const ios = isIos();
     installButton.disabled = !available;
     installButton.setAttribute("aria-disabled", String(!available));
-    status.textContent = available ? "Bereit zur Installation." : "Installation wird vorbereitet…";
+    if (ios) {
+      installButton.disabled = false;
+      installButton.setAttribute("aria-disabled", "false");
+      installButton.textContent = "Zum Home-Bildschirm";
+      status.textContent = "Tippe auf „Teilen“ und wähle „Zum Home-Bildschirm“.";
+    } else {
+      installButton.textContent = "Jetzt installieren";
+      status.textContent = available ? "Bereit zur Installation." : "Installation wird vorbereitet…";
+    }
   }
 
   function createBanner() {
     if (document.getElementById("installBanner")) return;
     if (localStorage.getItem(dismissKey) === "true") return;
     if (isStandalone()) return;
+    if (!deferredPrompt && !isIos()) return;
 
     const banner = document.createElement("div");
     banner.id = "installBanner";
@@ -49,6 +91,10 @@
 
     const installButton = document.getElementById("btnInstallApp");
     installButton.onclick = async () => {
+      if (isIos()) {
+        alert("Öffne das Teilen-Menü und wähle „Zum Home-Bildschirm“, um die App zu installieren.");
+        return;
+      }
       if (!deferredPrompt) {
         updateBannerState(banner);
         return;
@@ -69,6 +115,7 @@
     };
 
     updateBannerState(banner);
+    setBannerIcon(banner);
   }
 
   window.addEventListener("beforeinstallprompt", (e) => {
