@@ -42,6 +42,10 @@
         return String(value).padStart(2, "0");
       }
 
+      function formatTime(date) {
+        return `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+      }
+
       function setStatus(text, detail, isWarning) {
         const statusEl = document.getElementById("stampStatus");
         const detailEl = document.getElementById("stampDetail");
@@ -71,11 +75,7 @@
         setStatus(`${action} um ${result.timeString}`, `Timeout: 10 Sek. aktiv${suffix}`, false);
       }
 
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", attemptStamp);
-      } else {
-        attemptStamp();
-      }
+      document.addEventListener("DOMContentLoaded", attemptStamp);
     })();
   </script>
 </body>
