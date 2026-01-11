@@ -32,7 +32,7 @@
     banner.innerHTML = `
       <div class="install-banner">
         <div class="install-info">
-          <img class="install-icon" src="/public/icons/icon-192.png" alt="Stempeluhr" width="48" height="48" />
+          <img class="install-icon" src="/icons/icon-192.png" alt="Stempeluhr" width="48" height="48" />
           <div>
             <div class="install-title">Stempeluhr installieren</div>
             <div class="install-status" id="installStatus">Installation wird vorbereitet…</div>
