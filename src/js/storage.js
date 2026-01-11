@@ -38,12 +38,12 @@
   }
 
   function load() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultData();
     try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return defaultData();
       return migrate(JSON.parse(raw));
     } catch (e) {
-      console.error("Speicher konnte nicht gelesen werden", e);
+      console.error("Storage load failed", e);
       return defaultData();
     }
   }
@@ -65,6 +65,34 @@
     const data = load();
     return data.stamps.length ? data.stamps[data.stamps.length - 1] : null;
   }
+
+  // Wir verwenden timestamp als "ID" (praktisch eindeutig).
+  function updateStampByTimestamp(timestamp, patch) {
+    const data = load();
+    const stamps = Array.isArray(data.stamps) ? data.stamps : [];
+    const idx = stamps.findIndex(s => s && s.timestamp === timestamp);
+    if (idx < 0) return false;
+
+    stamps[idx] = { ...stamps[idx], ...(patch || {}) };
+    data.stamps = stamps;
+    save(data);
+    return true;
+  }
+
+  // NEU: Entfernt einen Stempel per timestamp (timestamp ist die "ID")
+  function deleteStampByTimestamp(timestamp) {
+    const data = load();
+    const stamps = Array.isArray(data.stamps) ? data.stamps : [];
+    const idx = stamps.findIndex(s => s && s.timestamp === timestamp);
+    if (idx < 0) return false;
+
+    stamps.splice(idx, 1);
+    data.stamps = stamps;
+    save(data);
+    return true;
+  }
+
+  // ----- Settings -----
 
   function updateSettings(settings) {
     const data = load();
@@ -90,20 +118,20 @@
     return Array.isArray(data.absences) ? data.absences : [];
   }
 
-  function upsertAbsence(record) {
+  function upsertAbsence(entry) {
     const data = load();
-    const abs = Array.isArray(data.absences) ? data.absences : [];
-    const idx = abs.findIndex(a => a && a.date === record.date);
-    if (idx >= 0) abs[idx] = record;
-    else abs.push(record);
-    data.absences = abs;
+    const list = Array.isArray(data.absences) ? data.absences : [];
+    const idx = list.findIndex(x => x && x.date === entry.date);
+    if (idx >= 0) list[idx] = { ...list[idx], ...entry };
+    else list.push(entry);
+    data.absences = list;
     save(data);
   }
 
   function removeAbsence(dateStr) {
     const data = load();
-    const abs = Array.isArray(data.absences) ? data.absences : [];
-    data.absences = abs.filter(a => a && a.date !== dateStr);
+    const list = Array.isArray(data.absences) ? data.absences : [];
+    data.absences = list.filter(x => x && x.date !== dateStr);
     save(data);
   }
 
@@ -118,7 +146,7 @@
     const data = load();
     const list = Array.isArray(data.manualWork) ? data.manualWork : [];
     const idx = list.findIndex(x => x && x.date === entry.date);
-    if (idx >= 0) list[idx] = entry;
+    if (idx >= 0) list[idx] = { ...list[idx], ...entry };
     else list.push(entry);
     data.manualWork = list;
     save(data);
@@ -131,20 +159,6 @@
     save(data);
   }
 
-  // ----- Stamps update helper (NEU) -----
-  // Wir verwenden timestamp als "ID" (praktisch eindeutig).
-  function updateStampByTimestamp(timestamp, patch) {
-    const data = load();
-    const stamps = Array.isArray(data.stamps) ? data.stamps : [];
-    const idx = stamps.findIndex(s => s && s.timestamp === timestamp);
-    if (idx < 0) return false;
-
-    stamps[idx] = { ...stamps[idx], ...(patch || {}) };
-    data.stamps = stamps;
-    save(data);
-    return true;
-  }
-
   function clearAll() {
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -153,6 +167,7 @@
     getData,
     addStamp,
     getLastStamp,
+
     updateSettings,
     getSettings,
     updateMeta,
@@ -169,6 +184,7 @@
     removeManualWork,
 
     // stamps update
-    updateStampByTimestamp
+    updateStampByTimestamp,
+    deleteStampByTimestamp
   };
 })();
