@@ -19,17 +19,23 @@
     };
   }
 
+  /**
+   * True = letzter Stempel war IN und wir sind nach 03:00 am FOLGETAG.
+   * Dann gilt: "Ausstempeln vergessen" -> manuelle Prüfung nötig.
+   */
   function isAfterNightBoundary(lastStamp, current) {
     if (!lastStamp) return false;
+    if (lastStamp.type !== "IN") return false;
 
     const last = new Date(lastStamp.timestamp);
     const nowDate = new Date(current.timestamp);
 
-    // Grenze: 03:00 Uhr
+    // Grenze: 03:00 am nächsten Tag (bezogen auf den Tag des letzten IN)
     const boundary = new Date(last);
+    boundary.setDate(boundary.getDate() + 1);
     boundary.setHours(3, 0, 0, 0);
 
-    return nowDate > boundary && lastStamp.type === "IN";
+    return nowDate > boundary;
   }
 
   function toggleStamp() {
@@ -42,15 +48,13 @@
     if (!lastStamp) {
       type = "IN";
     } else if (lastStamp.type === "IN") {
-
       if (isAfterNightBoundary(lastStamp, current)) {
-        // Sicherheitsfall: Ausstempeln vergessen
+        // Sicherheitsfall: Ausstempeln vergessen (nach 03:00 am Folgetag)
         needsManualFix = true;
         type = "IN";
       } else {
         type = "OUT";
       }
-
     } else {
       type = "IN";
     }
@@ -58,7 +62,9 @@
     const stamp = {
       type,
       ...current,
-      manualRequired: needsManualFix
+      manualRequired: needsManualFix,
+      // optional, falls du das später im UI gesondert markieren willst:
+      cutoffFlag: needsManualFix
     };
 
     StorageService.addStamp(stamp);
@@ -78,4 +84,3 @@
   };
 
 })();
-
