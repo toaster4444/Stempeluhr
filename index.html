@@ -2,13 +2,14 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <title>Stempeluhr – Übersicht</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stempeluhr</title>
 
-  <link rel="manifest" href="public/manifest.json" />
+  <link rel="manifest" href="public/manifest.webmanifest" />
   <meta name="theme-color" content="#1f2933" />
+  <link rel="icon" href="public/icons/icon-192.png" />
 
-  <link rel="stylesheet" href="src/css/style.css" />
+  <link rel="stylesheet" href="public/style.css" />
 </head>
 <body>
 
@@ -19,7 +20,8 @@
     </div>
 
     <nav class="nav">
-      <a class="btn" href="toggle.html">Jetzt stempeln</a>
+      <!-- WICHTIG: war vorher ein Link auf toggle.html, jetzt ist es ein Button -->
+      <button class="btn" id="btnStampNow" type="button">Jetzt stempeln</button>
       <a class="btn secondary" href="settings.html">Einstellungen</a>
     </nav>
   </header>
@@ -28,61 +30,59 @@
 
     <section class="card">
       <div class="row">
-        <h2>Auswertung</h2>
-        <div class="row-right">
-          <button class="btn secondary" id="btnRecalc" type="button">Neu berechnen</button>
+        <h2>Heute</h2>
+        <div class="muted small" id="todayDate">–</div>
+      </div>
+
+      <div class="grid2" style="margin-top:0.75rem;">
+        <div class="stat">
+          <div class="label">Soll</div>
+          <div class="value" id="todayTarget">–</div>
+        </div>
+        <div class="stat">
+          <div class="label">Ist</div>
+          <div class="value" id="todayActual">–</div>
+        </div>
+        <div class="stat">
+          <div class="label">Differenz</div>
+          <div class="value" id="todayDiff">–</div>
+        </div>
+        <div class="stat">
+          <div class="label">Status</div>
+          <div class="value" id="todayStatus">–</div>
         </div>
       </div>
 
-      <div class="grid2">
-        <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
-          <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Diese Woche</h3>
-          <div class="muted small" id="weekRange">–</div>
+      <div class="muted small" style="margin-top:0.75rem;" id="todayFlags">–</div>
 
-          <div style="margin-top:0.5rem;">
-            <div class="label">IST (Stunden)</div>
-            <div class="value" id="weekWorked">–</div>
-            <div class="muted small" id="weekManualAdded">–</div>
-            <div class="muted small" id="weekStampIgnored">–</div>
-          </div>
+      <div class="actions" style="margin-top:1rem;">
+        <button class="btn secondary" id="btnRefresh" type="button">Aktualisieren</button>
+        <button class="btn secondary" id="btnRecalc" type="button">Neu berechnen</button>
+      </div>
+    </section>
 
-          <div style="margin-top:0.5rem;">
-            <div class="label">SOLL (Stunden)</div>
-            <div class="value" id="weekTarget">–</div>
-          </div>
+    <section class="card">
+      <div class="row">
+        <h2>Monat</h2>
+        <div class="muted small" id="monthRange">–</div>
+      </div>
 
-          <div style="margin-top:0.5rem;">
-            <div class="label">Differenz</div>
-            <div class="value" id="weekDiff">–</div>
-          </div>
-
-          <div class="muted small" style="margin-top:0.5rem;" id="weekFlags">–</div>
+      <div class="grid2" style="margin-top:0.75rem;">
+        <div class="stat">
+          <div class="label">Soll</div>
+          <div class="value" id="monthTarget">–</div>
         </div>
-
-        <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
-          <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Dieser Monat</h3>
-          <div class="muted small" id="monthRange">–</div>
-
-          <div style="margin-top:0.5rem;">
-            <div class="label">IST (Stunden)</div>
-            <div class="value" id="monthWorked">–</div>
-            <div class="muted small" id="monthManualAdded">–</div>
-            <div class="muted small" id="monthStampIgnored">–</div>
-          </div>
-
-          <div style="margin-top:0.5rem;">
-            <div class="label">SOLL (Stunden)</div>
-            <div class="value" id="monthTarget">–</div>
-          </div>
-
-          <div style="margin-top:0.5rem;">
-            <div class="label">Differenz</div>
-            <div class="value" id="monthDiff">–</div>
-          </div>
-
-          <div class="muted small" style="margin-top:0.5rem;" id="monthFlags">–</div>
+        <div class="stat">
+          <div class="label">Ist</div>
+          <div class="value" id="monthActual">–</div>
+        </div>
+        <div class="stat">
+          <div class="label">Differenz</div>
+          <div class="value" id="monthDiff">–</div>
         </div>
       </div>
+
+      <div class="muted small" style="margin-top:0.5rem;" id="monthFlags">–</div>
     </section>
 
     <section class="card">
@@ -93,158 +93,42 @@
     <section class="card">
       <div class="row">
         <h2>Fehltage (Urlaub/Krankheit)</h2>
-        <div class="row-right">
+        <div class="actions">
           <button class="btn secondary" id="btnAbsRefresh" type="button">Aktualisieren</button>
         </div>
       </div>
-
-      <p class="muted small">
-        Automatisch: Soll-Tage ohne Stempel werden bis gestern als <b>Urlaub (auto)</b> markiert.
-        Mit <b>Zeit</b> kannst du für den Tag Arbeitszeit nachtragen (überschreibt Stempelzeit für diesen Tag).
-      </p>
-
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Datum</th>
-              <th>Status</th>
-              <th>Auto</th>
-              <th>⚠ Problem</th>
-              <th>Aktionen</th>
-            </tr>
-          </thead>
-          <tbody id="absTbody">
-            <tr><td colspan="5" class="muted">Keine</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <div id="absencesMount"></div>
     </section>
 
     <section class="card">
       <div class="row">
-        <h2>Manuelle Nachträge (aktueller Monat)</h2>
-        <div class="row-right">
+        <h2>Manuelle Einträge</h2>
+        <div class="actions">
           <button class="btn secondary" id="btnManualRefresh" type="button">Aktualisieren</button>
         </div>
       </div>
-
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Datum</th>
-              <th>Start</th>
-              <th>Ende</th>
-              <th>Pause (min)</th>
-              <th>Arbeitszeit (min)</th>
-              <th>Hinweis</th>
-              <th>Aktionen</th>
-            </tr>
-          </thead>
-          <tbody id="manualTbody">
-            <tr><td colspan="7" class="muted">Keine</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Status</h2>
-      <div class="grid2">
-        <div>
-          <div class="label">Letzter Stempel</div>
-          <div class="value" id="lastStampValue">–</div>
-          <div class="muted" id="lastStampMeta">–</div>
-        </div>
-        <div>
-          <div class="label">Hinweise</div>
-          <div id="alerts" class="alerts">
-            <div class="muted">Keine</div>
-          </div>
-        </div>
-      </div>
+      <div id="manualMount"></div>
     </section>
 
     <section class="card">
       <div class="row">
-        <h2>Rohdaten (letzte 30)</h2>
-        <div class="row-right">
-          <button class="btn secondary" id="btnRefresh" type="button">Aktualisieren</button>
+        <h2>Export</h2>
+        <div class="actions">
+          <button class="btn secondary" id="btnExportCsv" type="button">CSV</button>
+          <button class="btn secondary" id="btnExportJson" type="button">JSON</button>
         </div>
       </div>
-
-      <div class="actions" style="margin: 0.5rem 0 0.75rem;">
-        <button class="btn" id="btnExportCsv" type="button">Export (Excel/CSV)</button>
-        <button class="btn secondary" id="btnExportJson" type="button">Backup (JSON)</button>
-        <span class="muted small" id="exportHint">–</span>
-      </div>
-
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Typ</th>
-              <th>Datum</th>
-              <th>Uhrzeit</th>
-              <th>ISO</th>
-              <th>Manuell nötig</th>
-            </tr>
-          </thead>
-          <tbody id="stampsTbody">
-            <tr><td colspan="5" class="muted">Noch keine Einträge</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <div class="muted small" id="exportHint" style="margin-top:0.5rem;">–</div>
     </section>
 
   </main>
 
-  <!-- Modal: Arbeitszeit nachtragen -->
-  <div id="manualModal" class="modal hidden" aria-hidden="true">
-    <div class="modal-backdrop" id="modalBackdrop"></div>
-    <div class="modal-card">
-      <div class="row">
-        <h3 style="margin:0;">Arbeitszeit nachtragen</h3>
-        <button class="btn secondary" id="btnModalClose" type="button">✕</button>
-      </div>
-
-      <div class="muted small" id="modalDateLabel">–</div>
-
-      <div class="grid2" style="margin-top:0.75rem;">
-        <div>
-          <label class="label" for="mwStart">Start (HH:MM)</label>
-          <input id="mwStart" type="time" style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
-        </div>
-        <div>
-          <label class="label" for="mwEnd">Ende (HH:MM)</label>
-          <input id="mwEnd" type="time" style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
-        </div>
-      </div>
-
-      <div style="margin-top:0.75rem;">
-        <label class="label" for="mwBreak">Pause (Minuten)</label>
-        <input id="mwBreak" type="number" min="0" step="1" value="0"
-               style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
-      </div>
-
-      <div class="muted small" style="margin-top:0.5rem;" id="mwPreview">–</div>
-      <div class="muted small warn" style="margin-top:0.5rem;" id="mwError"></div>
-
-      <div class="row" style="margin-top:0.75rem;">
-        <button class="btn" id="btnMwSave" type="button">Speichern</button>
-        <button class="btn secondary" id="btnMwDelete" type="button">Löschen</button>
-      </div>
-    </div>
-  </div>
-
-  <footer class="footer muted">
-    <span>Alles lokal im Browser gespeichert.</span>
-  </footer>
-
+  <!-- Scripts (Reihenfolge wichtig: storage.js zuerst) -->
   <script src="src/js/storage.js"></script>
-  <script src="src/js/export.js"></script>
+  <!-- NEU: clock.js lädt die Toggle-Stempel-Logik (window.Clock.toggleStamp) -->
+  <script src="src/js/clock.js"></script>
 
+  <script src="src/js/export.js"></script>
   <script src="src/js/holidays.js"></script>
   <script src="src/js/analytics.js"></script>
 
@@ -257,8 +141,24 @@
   <script>
     (function () {
       function pad2(n) { return String(n).padStart(2, "0"); }
-      function formatDate(st) { return `${st.year}-${pad2(st.month)}-${pad2(st.day)}`; }
-      function formatTime(st) { return `${pad2(st.hour)}:${pad2(st.minute)}:${pad2(st.second)}`; }
+
+      function fmtDate(d) {
+        return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()}`;
+      }
+
+      function msToHHMM(ms) {
+        const sign = ms < 0 ? "-" : "";
+        const a = Math.abs(ms);
+        const totalMin = Math.round(a / 60000);
+        const hh = Math.floor(totalMin / 60);
+        const mm = totalMin % 60;
+        return `${sign}${pad2(hh)}:${pad2(mm)}`;
+      }
+
+      function setText(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+      }
 
       function setHint(text) {
         const el = document.getElementById("exportHint");
@@ -268,318 +168,111 @@
       // ---------- Problem-Helper ----------
       // Liefert { hasIssue:boolean, text:string } für ein Datum.
       function getIssueForDate(dateStr) {
-        const data = StorageService.getData();
-        const stamps = Array.isArray(data.stamps) ? data.stamps : [];
+        const d = StorageService.getDay(dateStr);
+        const stamps = (d && d.stamps) ? d.stamps.slice() : [];
+        stamps.sort((a, b) => a.timestamp - b.timestamp);
 
-        const reasons = [];
+        if (!stamps.length) return { hasIssue: false, text: "" };
 
-        for (const s of stamps) {
-          if (!s || !s.year) continue;
-          const ds = `${s.year}-${pad2(s.month)}-${pad2(s.day)}`;
-          if (ds !== dateStr) continue;
-
-          if (s.cutoffFlag) reasons.push("Ausstempeln vergessen (03:00)");
-          if (s.manualRequired) reasons.push("Manuelle Prüfung nötig");
+        // Problem: gleicher Typ zweimal hintereinander (z.B. IN, IN)
+        for (let i = 1; i < stamps.length; i++) {
+          if (stamps[i].type === stamps[i - 1].type) {
+            return { hasIssue: true, text: "Doppelter Typ (z.B. IN/IN)" };
+          }
         }
 
-        const last = stamps.length ? stamps[stamps.length - 1] : null;
-        if (last && last.type === "IN" && last.year) {
-          const lastDs = `${last.year}-${pad2(last.month)}-${pad2(last.day)}`;
-          if (lastDs === dateStr) reasons.push("Offener IN ohne OUT");
+        // Problem: ungerade Anzahl (IN ohne OUT)
+        const inCount = stamps.filter(s => s.type === "IN").length;
+        const outCount = stamps.filter(s => s.type === "OUT").length;
+        if (inCount !== outCount) {
+          return { hasIssue: true, text: "IN/OUT nicht ausgeglichen" };
         }
 
-        const uniq = Array.from(new Set(reasons));
-        return { hasIssue: uniq.length > 0, text: uniq.join(" • ") };
-      }
-
-      function hasAnyStampOnDate(dateStr) {
-        const data = StorageService.getData();
-        const stamps = Array.isArray(data.stamps) ? data.stamps : [];
-        return stamps.some(s => {
-          if (!s || !s.year) return false;
-          const ds = `${s.year}-${pad2(s.month)}-${pad2(s.day)}`;
-          return ds === dateStr;
-        });
-      }
-
-      // ---------- Modal State ----------
-      let currentModalDate = null;
-
-      const modal = document.getElementById("manualModal");
-      const modalBackdrop = document.getElementById("modalBackdrop");
-      const btnModalClose = document.getElementById("btnModalClose");
-      const modalDateLabel = document.getElementById("modalDateLabel");
-      const mwStart = document.getElementById("mwStart");
-      const mwEnd = document.getElementById("mwEnd");
-      const mwBreak = document.getElementById("mwBreak");
-      const mwPreview = document.getElementById("mwPreview");
-      const mwError = document.getElementById("mwError");
-      const btnMwSave = document.getElementById("btnMwSave");
-      const btnMwDelete = document.getElementById("btnMwDelete");
-
-      function openModal(dateStr) {
-        currentModalDate = dateStr;
-        mwError.textContent = "";
-        modalDateLabel.textContent = `Datum: ${dateStr}`;
-
-        const existing = ManualWorkService.getByDate(dateStr);
-        if (existing) {
-          mwStart.value = existing.start || "";
-          mwEnd.value = existing.end || "";
-          mwBreak.value = String(existing.breakMinutes ?? 0);
-        } else {
-          mwStart.value = "";
-          mwEnd.value = "";
-          mwBreak.value = "0";
+        // Problem: manuelle Korrektur erforderlich markiert
+        if (stamps.some(s => s.manualRequired)) {
+          return { hasIssue: true, text: "Manuelle Prüfung nötig" };
         }
 
-        updatePreview();
-
-        modal.classList.remove("hidden");
-        modal.setAttribute("aria-hidden", "false");
+        return { hasIssue: false, text: "" };
       }
 
-      function closeModal() {
-        modal.classList.add("hidden");
-        modal.setAttribute("aria-hidden", "true");
-        currentModalDate = null;
+      // ---------- RENDER: Hauptübersicht ----------
+      function renderMain() {
+        const now = new Date();
+        const todayStr = StorageService.dateToStr(now);
+        setText("todayDate", fmtDate(now));
+
+        const settings = StorageService.getSettings();
+        const day = StorageService.getDay(todayStr);
+
+        const isHoliday = HolidaysService.isHoliday(todayStr);
+        const abs = AbsenceService.getAbsence(todayStr);
+
+        const targetMs = AnalyticsService.getTargetForDate(todayStr, settings, isHoliday, abs);
+        const actualMs = AnalyticsService.getActualForDate(todayStr, day);
+        const diffMs = actualMs - targetMs;
+
+        setText("todayTarget", msToHHMM(targetMs));
+        setText("todayActual", msToHHMM(actualMs));
+        setText("todayDiff", msToHHMM(diffMs));
+
+        const issue = getIssueForDate(todayStr);
+        const flags = [];
+        if (isHoliday) flags.push("Feiertag");
+        if (abs) flags.push(abs.type);
+        if (issue.hasIssue) flags.push("⚠️ Problem: " + issue.text);
+
+        setText("todayFlags", flags.length ? flags.join(" • ") : "–");
+        setText("todayStatus", issue.hasIssue ? "⚠️ prüfen" : (diffMs >= 0 ? "OK" : "–"));
       }
 
-      function updatePreview() {
-        mwError.textContent = "";
-        if (!currentModalDate) { mwPreview.textContent = "–"; return; }
-
-        const s = mwStart.value;
-        const e = mwEnd.value;
-        const b = Number(mwBreak.value || 0);
-
-        if (!s || !e) {
-          mwPreview.textContent = "Bitte Start und Ende eintragen.";
-          return;
-        }
-
-        function toMin(t) {
-          const m = String(t).match(/^(\d{1,2}):(\d{2})$/);
-          if (!m) return null;
-          const hh = Number(m[1]), mm = Number(m[2]);
-          if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
-          return hh * 60 + mm;
-        }
-
-        const sm = toMin(s), em = toMin(e);
-        if (sm === null || em === null) { mwPreview.textContent = "Ungültige Zeit."; return; }
-        if (em <= sm) { mwPreview.textContent = "Ende muss nach Start liegen."; return; }
-
-        const worked = Math.max(0, (em - sm) - Math.max(0, b));
-        const hours = (worked / 60).toFixed(2);
-        mwPreview.textContent = `Ergebnis: ${worked} Minuten (= ${hours} Stunden)`;
-      }
-
-      mwStart.addEventListener("input", updatePreview);
-      mwEnd.addEventListener("input", updatePreview);
-      mwBreak.addEventListener("input", updatePreview);
-
-      modalBackdrop.onclick = closeModal;
-      btnModalClose.onclick = closeModal;
-
-      btnMwSave.onclick = () => {
-        if (!currentModalDate) return;
-        const res = ManualWorkService.upsert(currentModalDate, mwStart.value, mwEnd.value, Number(mwBreak.value || 0));
-        if (!res.ok) { mwError.textContent = res.error; return; }
-
-        AbsenceService.setAbsence(currentModalDate, AbsenceService.TYPES.WORK_MANUAL);
-
-        closeModal();
-        renderAll();
-      };
-
-      btnMwDelete.onclick = () => {
-        if (!currentModalDate) return;
-        ManualWorkService.remove(currentModalDate);
-        closeModal();
-        renderAll();
-      };
-
-      // ---------- Rendering ----------
+      // ---------- RENDER: Monat ----------
       function renderAnalysis() {
-        const summary = Analytics.getSummary();
+        const settings = StorageService.getSettings();
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth(); // 0..11
 
-        document.getElementById("weekRange").textContent =
-          `${Analytics.formatDateYYYYMMDD(summary.week.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.week.endExclusive.getTime() - 1))}`;
+        const first = new Date(year, month, 1);
+        const last = new Date(year, month + 1, 0);
 
-        document.getElementById("weekWorked").textContent = Analytics.formatHours(summary.week.workedHours);
-        document.getElementById("weekManualAdded").textContent =
-          `Manuell gezählt: ${Analytics.formatHours(summary.week.manualHoursAdded)} h`;
-        document.getElementById("weekStampIgnored").textContent =
-          `Stempel ignoriert (wegen manuell): ${Analytics.formatHours(summary.week.stampHoursIgnored)} h`;
+        setText("monthRange", `${fmtDate(first)} – ${fmtDate(last)}`);
 
-        document.getElementById("weekTarget").textContent = Analytics.formatHours(summary.week.targetHours);
-        document.getElementById("weekDiff").textContent = Analytics.formatSignedDiff(summary.week.diffHours);
-        document.getElementById("weekFlags").textContent =
-          `Stempel-Hinweise: Manuell: ${summary.week.manualCount} • Offene IN: ${summary.week.openCount} • OUT ohne IN: ${summary.week.unmatchedOutCount}`;
+        const result = AnalyticsService.getMonthSummary(year, month, settings, HolidaysService, AbsenceService);
 
-        document.getElementById("monthRange").textContent =
-          `${Analytics.formatDateYYYYMMDD(summary.month.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.month.endExclusive.getTime() - 1))}`;
+        setText("monthTarget", msToHHMM(result.targetMs));
+        setText("monthActual", msToHHMM(result.actualMs));
+        setText("monthDiff", msToHHMM(result.actualMs - result.targetMs));
 
-        document.getElementById("monthWorked").textContent = Analytics.formatHours(summary.month.workedHours);
-        document.getElementById("monthManualAdded").textContent =
-          `Manuell gezählt: ${Analytics.formatHours(summary.month.manualHoursAdded)} h`;
-        document.getElementById("monthStampIgnored").textContent =
-          `Stempel ignoriert (wegen manuell): ${Analytics.formatHours(summary.month.stampHoursIgnored)} h`;
-
-        document.getElementById("monthTarget").textContent = Analytics.formatHours(summary.month.targetHours);
-        document.getElementById("monthDiff").textContent = Analytics.formatSignedDiff(summary.month.diffHours);
-        document.getElementById("monthFlags").textContent =
-          `Stempel-Hinweise: Manuell: ${summary.month.manualCount} • Offene IN: ${summary.month.openCount} • OUT ohne IN: ${summary.month.unmatchedOutCount}`;
+        const flags = [];
+        if (result.problemDays && result.problemDays.length) {
+          flags.push(`⚠️ Problem-Tage: ${result.problemDays.length}`);
+        }
+        setText("monthFlags", flags.length ? flags.join(" • ") : "–");
       }
 
       function renderCalendar() {
-        if (window.CalendarView) CalendarView.renderMonth("calendarMount", new Date());
+        const mount = document.getElementById("calendarMount");
+        if (!mount) return;
+        mount.innerHTML = "";
+        CalendarService.render(mount);
       }
 
       function renderAbsences() {
-        const tbody = document.getElementById("absTbody");
-        tbody.innerHTML = "";
-
-        const list = AbsenceService.listAbsencesForMonth(new Date());
-        if (!list.length) {
-          tbody.innerHTML = `<tr><td colspan="5" class="muted">Keine</td></tr>`;
-          return;
-        }
-
-        list.forEach(a => {
-          const label =
-            a.type === "VACATION" ? "Urlaub" :
-            a.type === "SICK" ? "Krank" :
-            a.type === "WORK_MANUAL" ? "Arbeit (manuell)" : a.type;
-
-          const issue = getIssueForDate(a.date);
-
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td class="mono">${a.date}</td>
-            <td>${label}</td>
-            <td class="${a.auto ? "warn" : "muted"}">${a.auto ? "ja" : "nein"}</td>
-            <td class="${issue.hasIssue ? "warn" : "muted"}" title="${issue.hasIssue ? issue.text : ""}">
-              ${issue.hasIssue ? `⚠ ${issue.text}` : "–"}
-            </td>
-            <td>
-              <button class="btn secondary" data-act="time">Zeit</button>
-              <button class="btn secondary" data-act="vac">Urlaub</button>
-              <button class="btn secondary" data-act="sick">Krank</button>
-              <button class="btn secondary" data-act="work">Arbeit</button>
-              <button class="btn secondary" data-act="clear">Entfernen</button>
-            </td>
-          `;
-
-          tr.querySelectorAll("button").forEach(btn => {
-            btn.onclick = () => {
-              const act = btn.getAttribute("data-act");
-              if (act === "time") { openModal(a.date); return; }
-              if (act === "vac") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.VACATION);
-              if (act === "sick") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.SICK);
-              if (act === "work") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.WORK_MANUAL);
-              if (act === "clear") AbsenceService.clearAbsence(a.date);
-
-              renderAbsences();
-              renderCalendar();
-              renderAnalysis();
-            };
-          });
-
-          tbody.appendChild(tr);
-        });
+        const mount = document.getElementById("absencesMount");
+        if (!mount) return;
+        mount.innerHTML = "";
+        AbsenceService.render(mount);
       }
 
       function renderManualWork() {
-        const tbody = document.getElementById("manualTbody");
-        tbody.innerHTML = "";
-
-        const list = ManualWorkService.listForMonth(new Date());
-        if (!list.length) {
-          tbody.innerHTML = `<tr><td colspan="7" class="muted">Keine</td></tr>`;
-          return;
-        }
-
-        list.forEach(e => {
-          const stampHint = hasAnyStampOnDate(e.date)
-            ? "Stempel vorhanden (ignoriert in Auswertung)"
-            : "–";
-
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td class="mono">${e.date}</td>
-            <td>${e.start}</td>
-            <td>${e.end}</td>
-            <td>${e.breakMinutes}</td>
-            <td>${e.minutesWorked}</td>
-            <td class="${stampHint !== "–" ? "warn" : "muted"}">${stampHint}</td>
-            <td>
-              <button class="btn secondary" data-act="edit">Bearbeiten</button>
-              <button class="btn secondary" data-act="del">Löschen</button>
-            </td>
-          `;
-
-          tr.querySelector('[data-act="edit"]').onclick = () => openModal(e.date);
-          tr.querySelector('[data-act="del"]').onclick = () => { ManualWorkService.remove(e.date); renderAll(); };
-
-          tbody.appendChild(tr);
-        });
-      }
-
-      function renderMain() {
-        const data = StorageService.getData();
-        const stamps = data.stamps || [];
-        const last = stamps[stamps.length - 1];
-
-        const lastStampValue = document.getElementById("lastStampValue");
-        const lastStampMeta = document.getElementById("lastStampMeta");
-
-        if (!last) {
-          lastStampValue.textContent = "–";
-          lastStampMeta.textContent = "Noch keine Stempel vorhanden";
-        } else {
-          lastStampValue.textContent = `${last.type} • ${formatDate(last)} ${formatTime(last)}`;
-          lastStampMeta.textContent = `timestamp: ${last.timestamp}${last.manualRequired ? " • ⚠️ manuell" : ""}`;
-        }
-
-        const alerts = document.getElementById("alerts");
-        alerts.innerHTML = "";
-
-        const manual = stamps.filter(s => s && s.manualRequired);
-        if (manual.length === 0) {
-          alerts.innerHTML = `<div class="muted">Keine</div>`;
-        } else {
-          manual.slice(-5).reverse().forEach(s => {
-            const div = document.createElement("div");
-            div.className = "alert";
-            div.textContent = `⚠️ Manuelle Prüfung: ${formatDate(s)} ${formatTime(s)}`;
-            alerts.appendChild(div);
-          });
-        }
-
-        const tbody = document.getElementById("stampsTbody");
-        tbody.innerHTML = "";
-
-        if (stamps.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="5" class="muted">Noch keine Einträge</td></tr>`;
-        } else {
-          stamps.slice(-30).reverse().forEach(st => {
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-              <td class="${st.manualRequired ? "warn" : ""}">${st.type}</td>
-              <td>${formatDate(st)}</td>
-              <td>${formatTime(st)}</td>
-              <td class="mono">${st.iso}</td>
-              <td class="${st.manualRequired ? "warn" : "muted"}">${st.manualRequired ? "JA" : "nein"}</td>
-            `;
-            tbody.appendChild(tr);
-          });
-        }
+        const mount = document.getElementById("manualMount");
+        if (!mount) return;
+        mount.innerHTML = "";
+        ManualWorkService.render(mount);
       }
 
       function renderAll() {
-        if (window.AbsenceService) AbsenceService.ensureAutoVacationUpToYesterday();
         renderAnalysis();
         renderCalendar();
         renderAbsences();
@@ -587,13 +280,47 @@
         renderMain();
       }
 
+      // ---------- BUTTONS ----------
+      // NEU: Jetzt stempeln direkt auf der Startseite
+      const btnStampNow = document.getElementById("btnStampNow");
+      if (btnStampNow) {
+        btnStampNow.onclick = () => {
+          try {
+            const result = Clock.toggleStamp(); // IN oder OUT
+            setHint(`Gestempelt: ${result.type} • ${result.timeString}`);
+            renderAll();
+          } catch (e) {
+            console.error(e);
+            setHint("Fehler beim Stempeln (siehe Konsole)");
+          }
+        };
+      }
+
       document.getElementById("btnRefresh").onclick = () => { renderAll(); setHint("Aktualisiert"); };
       document.getElementById("btnRecalc").onclick = () => { renderAnalysis(); renderCalendar(); };
-      document.getElementById("btnAbsRefresh").onclick = () => { AbsenceService.ensureAutoVacationUpToYesterday(); renderAbsences(); renderCalendar(); };
-      document.getElementById("btnManualRefresh").onclick = () => { renderManualWork(); renderAnalysis(); };
 
-      document.getElementById("btnExportCsv").onclick = () => { ExportService.exportStampsCSV({ delimiter: ";" }); setHint("CSV exportiert"); };
-      document.getElementById("btnExportJson").onclick = () => { ExportService.exportAllJSON(); setHint("JSON exportiert"); };
+      document.getElementById("btnAbsRefresh").onclick = () => {
+        AbsenceService.ensureAutoVacationUpToYesterday();
+        renderAbsences();
+        renderCalendar();
+        renderAnalysis();
+        setHint("Fehltage aktualisiert");
+      };
+
+      document.getElementById("btnManualRefresh").onclick = () => {
+        renderManualWork();
+        renderAnalysis();
+        setHint("Manuelle Einträge aktualisiert");
+      };
+
+      document.getElementById("btnExportCsv").onclick = () => {
+        ExportService.exportStampsCSV({ delimiter: ";" });
+        setHint("CSV exportiert");
+      };
+      document.getElementById("btnExportJson").onclick = () => {
+        ExportService.exportAllJSON();
+        setHint("JSON exportiert");
+      };
 
       renderAll();
     })();
