@@ -11,6 +11,9 @@
     { "src": "^/$", "dest": "/index.html" },
     { "src": "^/settings/?$", "dest": "/settings.html" },
     { "src": "^/toggle/?$", "dest": "/toggle.html" },
-    { "src": "^(?!/src/|/public/).*$", "dest": "/index.html" }
+
+    { "handle": "filesystem" },
+
+    { "src": ".*", "dest": "/index.html" }
   ]
 }
