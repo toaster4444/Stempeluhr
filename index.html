@@ -9,6 +9,39 @@
   <meta name="theme-color" content="#1f2933" />
 
   <link rel="stylesheet" href="src/css/style.css" />
+
+  <!-- Mobile-Feinschliff nur für diese Seite -->
+  <style>
+    /* Table für "Tage & Stempel" mobile-tauglicher */
+    .days-table td { vertical-align: top; }
+    .days-stamps-wrap { display:flex; flex-direction:column; gap:0.35rem; }
+    .stamp-line { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; }
+    .stamp-actions { display:flex; gap:0.35rem; flex-wrap:wrap; }
+    .btn.mini { padding: 0.2rem 0.45rem; font-size: 0.85rem; }
+
+    .days-subrow td {
+      padding-top: 0.6rem;
+      padding-bottom: 0.6rem;
+      border-top: 0;
+    }
+    .subrow-box {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:0.75rem;
+      flex-wrap:wrap;
+    }
+    .subrow-left { min-width: 200px; }
+    .subrow-right { display:flex; gap:0.5rem; flex-wrap:wrap; }
+
+    /* Auf kleinen Screens Header ausblenden, weil jeder Tag 2 Zeilen hat */
+    @media (max-width: 640px) {
+      .days-table thead { display:none; }
+      .days-table td { padding: 0.6rem; }
+      .subrow-box { flex-direction:column; align-items:stretch; }
+      .subrow-right { justify-content:flex-start; }
+    }
+  </style>
 </head>
 <body>
 
@@ -130,23 +163,21 @@
       </div>
 
       <p class="muted small">
-        Hier siehst du alle Tage des Monats mit allen Stempeln (IN/OUT). Konflikte sind rot markiert.
+        Es werden nur Tage bis heute angezeigt. Konflikte stehen darunter in rot.
         Pro Tag kannst du Stempel hinzufügen, bearbeiten oder löschen. „Zeit“ öffnet den Arbeitszeit-Nachtrag.
       </p>
 
       <div class="table-wrap">
-        <table class="table">
+        <table class="table days-table">
           <thead>
             <tr>
-              <th>Datum</th>
+              <th style="width: 120px;">Datum</th>
               <th>Stempel (IN/OUT)</th>
-              <th>Manuell</th>
-              <th>⚠ Konflikt</th>
-              <th>Aktionen</th>
+              <th style="width: 260px;">Manuell</th>
             </tr>
           </thead>
           <tbody id="daysTbody">
-            <tr><td colspan="5" class="muted">Lade…</td></tr>
+            <tr><td colspan="3" class="muted">Lade…</td></tr>
           </tbody>
         </table>
       </div>
@@ -273,7 +304,6 @@
       function getIssueForDate(dateStr) {
         const data = StorageService.getData();
         const stamps = Array.isArray(data.stamps) ? data.stamps : [];
-
         const reasons = [];
 
         for (const s of stamps) {
@@ -293,16 +323,6 @@
 
         const uniq = Array.from(new Set(reasons));
         return { hasIssue: uniq.length > 0, text: uniq.join(" • ") };
-      }
-
-      function hasAnyStampOnDate(dateStr) {
-        const data = StorageService.getData();
-        const stamps = Array.isArray(data.stamps) ? data.stamps : [];
-        return stamps.some(s => {
-          if (!s || !s.year) return false;
-          const ds = `${s.year}-${pad2(s.month)}-${pad2(s.day)}`;
-          return ds === dateStr;
-        });
       }
 
       // ---------- Modal State ----------
@@ -391,7 +411,6 @@
         if (!res.ok) { mwError.textContent = res.error; return; }
 
         AbsenceService.setAbsence(currentModalDate, AbsenceService.TYPES.WORK_MANUAL);
-
         closeModal();
         renderAll();
       };
@@ -440,72 +459,68 @@
         if (window.CalendarView) CalendarView.renderMonth("calendarMount", new Date());
       }
 
-function renderAbsences() {
-  const tbody = document.getElementById("absTbody");
-  tbody.innerHTML = "";
+      function renderAbsences() {
+        const tbody = document.getElementById("absTbody");
+        tbody.innerHTML = "";
 
-  const list = AbsenceService.listAbsencesForMonth(new Date());
-  if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="5" class="muted">Keine</td></tr>`;
-    return;
-  }
+        const list = AbsenceService.listAbsencesForMonth(new Date());
+        if (!list.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="muted">Keine</td></tr>`;
+          return;
+        }
 
-  list.forEach(a => {
-    const label =
-      a.type === "VACATION" ? "Urlaub" :
-      a.type === "SICK" ? "Krank" :
-      a.type === "WORK_MANUAL" ? "Arbeit (manuell)" : a.type;
+        list.forEach(a => {
+          const label =
+            a.type === "VACATION" ? "Urlaub" :
+            a.type === "SICK" ? "Krank" :
+            a.type === "WORK_MANUAL" ? "Arbeit (manuell)" : a.type;
 
-    const issue = getIssueForDate(a.date);
+          const issue = getIssueForDate(a.date);
+          const issueText = issue.hasIssue ? ("⚠ " + issue.text) : "–";
 
-    const issueText = issue.hasIssue ? ("⚠ " + issue.text) : "–";
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="mono">${a.date}</td>
+            <td>${label}</td>
+            <td class="${a.auto ? "warn" : "muted"}">${a.auto ? "ja" : "nein"}</td>
+            <td class="${issue.hasIssue ? "warn" : "muted"}" title="${issue.hasIssue ? issue.text : ""}">
+              ${issueText}
+            </td>
+            <td>
+              <button class="btn secondary" data-act="time" type="button">Zeit</button>
+              <button class="btn secondary" data-act="vac" type="button">Urlaub</button>
+              <button class="btn secondary" data-act="sick" type="button">Krank</button>
+              <button class="btn secondary" data-act="work" type="button">Arbeit</button>
+              <button class="btn secondary" data-act="clear" type="button">Entfernen</button>
+            </td>
+          `;
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="mono">${a.date}</td>
-      <td>${label}</td>
-      <td class="${a.auto ? "warn" : "muted"}">${a.auto ? "ja" : "nein"}</td>
-      <td class="${issue.hasIssue ? "warn" : "muted"}" title="${issue.hasIssue ? issue.text : ""}">
-        ${issueText}
-      </td>
-      <td>
-        <button class="btn secondary" data-act="time">Zeit</button>
-        <button class="btn secondary" data-act="vac">Urlaub</button>
-        <button class="btn secondary" data-act="sick">Krank</button>
-        <button class="btn secondary" data-act="work">Arbeit</button>
-        <button class="btn secondary" data-act="clear">Entfernen</button>
-      </td>
-    `;
+          tr.querySelectorAll("button").forEach(btn => {
+            btn.onclick = () => {
+              const act = btn.getAttribute("data-act");
+              if (act === "time") { openModal(a.date); return; }
+              if (act === "vac") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.VACATION);
+              if (act === "sick") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.SICK);
+              if (act === "work") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.WORK_MANUAL);
+              if (act === "clear") AbsenceService.clearAbsence(a.date);
 
-    tr.querySelectorAll("button").forEach(btn => {
-      btn.onclick = () => {
-        const act = btn.getAttribute("data-act");
-        if (act === "time") { openModal(a.date); return; }
-        if (act === "vac") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.VACATION);
-        if (act === "sick") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.SICK);
-        if (act === "work") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.WORK_MANUAL);
-        if (act === "clear") AbsenceService.clearAbsence(a.date);
+              renderAbsences();
+              renderCalendar();
+              renderAnalysis();
+              renderDaysStamps();
+            };
+          });
 
-        renderAbsences();
-        renderCalendar();
-        renderAnalysis();
-        renderDaysStamps();
-      };
-    });
-
-    tbody.appendChild(tr);
-  });
-}
-
+          tbody.appendChild(tr);
+        });
+      }
 
       // ---------- Tage & Stempel ----------
       function getConflictForStamps(stampsForDay) {
         const stamps = (stampsForDay || []).slice().sort((a, b) => a.timestamp - b.timestamp);
         const reasons = [];
 
-        if (stamps.some(s => s && (s.manualRequired || s.cutoffFlag))) {
-          reasons.push("Manuelle Prüfung nötig");
-        }
+        if (stamps.some(s => s && (s.manualRequired || s.cutoffFlag))) reasons.push("Manuelle Prüfung nötig");
 
         for (let i = 1; i < stamps.length; i++) {
           if (stamps[i] && stamps[i - 1] && stamps[i].type === stamps[i - 1].type) {
@@ -516,9 +531,7 @@ function renderAbsences() {
 
         const inCount = stamps.filter(s => s && s.type === "IN").length;
         const outCount = stamps.filter(s => s && s.type === "OUT").length;
-        if (inCount !== outCount) {
-          reasons.push(inCount > outCount ? "Offenes IN ohne OUT" : "OUT ohne IN");
-        }
+        if (inCount !== outCount) reasons.push(inCount > outCount ? "Offenes IN ohne OUT" : "OUT ohne IN");
 
         const uniq = Array.from(new Set(reasons));
         return { hasConflict: uniq.length > 0, text: uniq.join(" • ") };
@@ -552,10 +565,12 @@ function renderAbsences() {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth(); // 0..11
-        const lastDay = new Date(year, month + 1, 0).getDate();
         const monthNr = month + 1;
 
-        for (let d = 1; d <= lastDay; d++) {
+        // ✅ Nur bis heute (keine Zukunftstage)
+        const maxDay = now.getDate();
+
+        for (let d = 1; d <= maxDay; d++) {
           const dateStr = `${year}-${pad2(monthNr)}-${pad2(d)}`;
 
           const stampsForDay = stampsAll
@@ -566,39 +581,34 @@ function renderAbsences() {
           const manual = ManualWorkService.getByDate(dateStr);
           const conflict = getConflictForStamps(stampsForDay);
 
-          const tr = document.createElement("tr");
-          if (conflict.hasConflict) tr.className = "warn";
+          // --- Row 1: Datum + Stempel + Manuell
+          const tr1 = document.createElement("tr");
 
           const dateCell = document.createElement("td");
           dateCell.className = "mono";
           dateCell.textContent = dateStr;
 
           const stampCell = document.createElement("td");
-          stampCell.style.whiteSpace = "normal";
-
           if (!stampsForDay.length) {
             stampCell.innerHTML = `<span class="muted">–</span>`;
           } else {
             const wrap = document.createElement("div");
-            wrap.style.display = "flex";
-            wrap.style.flexDirection = "column";
-            wrap.style.gap = "0.35rem";
+            wrap.className = "days-stamps-wrap";
 
             stampsForDay.forEach(st => {
               const line = document.createElement("div");
-              line.style.display = "flex";
-              line.style.alignItems = "center";
-              line.style.gap = "0.5rem";
-              line.style.flexWrap = "wrap";
+              line.className = "stamp-line";
 
               const label = document.createElement("span");
               label.className = (st.manualRequired || st.cutoffFlag) ? "warn mono" : "mono";
               label.textContent = `${st.type} ${pad2(st.hour)}:${pad2(st.minute)}:${pad2(st.second)}`;
 
+              const actions = document.createElement("span");
+              actions.className = "stamp-actions";
+
               const btnEdit = document.createElement("button");
-              btnEdit.className = "btn secondary";
+              btnEdit.className = "btn secondary mini";
               btnEdit.type = "button";
-              btnEdit.style.padding = "0.2rem 0.45rem";
               btnEdit.textContent = "Bearbeiten";
               btnEdit.onclick = () => {
                 const tRes = promptType(st.type);
@@ -629,9 +639,8 @@ function renderAbsences() {
               };
 
               const btnDel = document.createElement("button");
-              btnDel.className = "btn secondary";
+              btnDel.className = "btn secondary mini";
               btnDel.type = "button";
-              btnDel.style.padding = "0.2rem 0.45rem";
               btnDel.textContent = "Löschen";
               btnDel.onclick = () => {
                 const ok = confirm(`Diesen Stempel wirklich löschen?\n${st.type} ${pad2(st.hour)}:${pad2(st.minute)}:${pad2(st.second)} (${dateStr})`);
@@ -641,6 +650,9 @@ function renderAbsences() {
                 setHint(`Stempel gelöscht: ${dateStr}`);
               };
 
+              actions.appendChild(btnEdit);
+              actions.appendChild(btnDel);
+
               line.appendChild(label);
               if (st.manualRequired || st.cutoffFlag) {
                 const flag = document.createElement("span");
@@ -648,9 +660,7 @@ function renderAbsences() {
                 flag.textContent = "⚠ manuell";
                 line.appendChild(flag);
               }
-              line.appendChild(btnEdit);
-              line.appendChild(btnDel);
-
+              line.appendChild(actions);
               wrap.appendChild(line);
             });
 
@@ -666,11 +676,31 @@ function renderAbsences() {
                <span class="muted small"> • Pause ${manual.breakMinutes} • ${manual.minutesWorked} min</span>`;
           }
 
-          const conflictCell = document.createElement("td");
-          conflictCell.className = conflict.hasConflict ? "warn" : "muted";
-          conflictCell.textContent = conflict.hasConflict ? `⚠ ${conflict.text}` : "–";
+          tr1.appendChild(dateCell);
+          tr1.appendChild(stampCell);
+          tr1.appendChild(manualCell);
 
-          const actionsCell = document.createElement("td");
+          // --- Row 2: Konflikt + Aktionen (Stempel+/Zeit) immer darunter
+          const tr2 = document.createElement("tr");
+          tr2.className = "days-subrow";
+
+          const td2 = document.createElement("td");
+          td2.colSpan = 3;
+
+          const box = document.createElement("div");
+          box.className = "subrow-box";
+
+          const left = document.createElement("div");
+          left.className = "subrow-left";
+
+          const conflictLine = document.createElement("div");
+          conflictLine.className = conflict.hasConflict ? "warn" : "muted";
+          conflictLine.textContent = conflict.hasConflict ? ("⚠ " + conflict.text) : "–";
+
+          left.appendChild(conflictLine);
+
+          const right = document.createElement("div");
+          right.className = "subrow-right";
 
           const btnAdd = document.createElement("button");
           btnAdd.className = "btn secondary";
@@ -710,17 +740,16 @@ function renderAbsences() {
           btnTime.textContent = "Zeit";
           btnTime.onclick = () => openModal(dateStr);
 
-          actionsCell.appendChild(btnAdd);
-          actionsCell.appendChild(document.createTextNode(" "));
-          actionsCell.appendChild(btnTime);
+          right.appendChild(btnAdd);
+          right.appendChild(btnTime);
 
-          tr.appendChild(dateCell);
-          tr.appendChild(stampCell);
-          tr.appendChild(manualCell);
-          tr.appendChild(conflictCell);
-          tr.appendChild(actionsCell);
+          box.appendChild(left);
+          box.appendChild(right);
+          td2.appendChild(box);
+          tr2.appendChild(td2);
 
-          tbody.appendChild(tr);
+          tbody.appendChild(tr1);
+          tbody.appendChild(tr2);
         }
       }
 
@@ -784,7 +813,7 @@ function renderAbsences() {
         renderMain();
       }
 
-      // Jetzt stempeln
+      // Buttons
       document.getElementById("btnStampNow").onclick = () => {
         const result = Clock.toggleStamp();
         setHint(`Gestempelt: ${result.type} • ${result.timeString}${result.manualRequired ? " • ⚠ manuell" : ""}`);
