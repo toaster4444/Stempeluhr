@@ -440,60 +440,63 @@
         if (window.CalendarView) CalendarView.renderMonth("calendarMount", new Date());
       }
 
-      function renderAbsences() {
-        const tbody = document.getElementById("absTbody");
-        tbody.innerHTML = "";
+function renderAbsences() {
+  const tbody = document.getElementById("absTbody");
+  tbody.innerHTML = "";
 
-        const list = AbsenceService.listAbsencesForMonth(new Date());
-        if (!list.length) {
-          tbody.innerHTML = `<tr><td colspan="5" class="muted">Keine</td></tr>`;
-          return;
-        }
+  const list = AbsenceService.listAbsencesForMonth(new Date());
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Keine</td></tr>`;
+    return;
+  }
 
-        list.forEach(a => {
-          const label =
-            a.type === "VACATION" ? "Urlaub" :
-            a.type === "SICK" ? "Krank" :
-            a.type === "WORK_MANUAL" ? "Arbeit (manuell)" : a.type;
+  list.forEach(a => {
+    const label =
+      a.type === "VACATION" ? "Urlaub" :
+      a.type === "SICK" ? "Krank" :
+      a.type === "WORK_MANUAL" ? "Arbeit (manuell)" : a.type;
 
-          const issue = getIssueForDate(a.date);
+    const issue = getIssueForDate(a.date);
 
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td class="mono">${a.date}</td>
-            <td>${label}</td>
-            <td class="${a.auto ? "warn" : "muted"}">${a.auto ? "ja" : "nein"}</td>
-            <td class="${issue.hasIssue ? "warn" : "muted"}" title="${issue.hasIssue ? issue.text : ""}">
-              ${issue.hasIssue ? `⚠ ${issue.text}` : "–"}
-            </td>
-            <td>
-              <button class="btn secondary" data-act="time">Zeit</button>
-              <button class="btn secondary" data-act="vac">Urlaub</button>
-              <button class="btn secondary" data-act="sick">Krank</button>
-              <button class="btn secondary" data-act="work">Arbeit</button>
-              <button class="btn secondary" data-act="clear">Entfernen</button>
-            </td>
-          `;
+    const issueText = issue.hasIssue ? ("⚠ " + issue.text) : "–";
 
-          tr.querySelectorAll("button").forEach(btn => {
-            btn.onclick = () => {
-              const act = btn.getAttribute("data-act");
-              if (act === "time") { openModal(a.date); return; }
-              if (act === "vac") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.VACATION);
-              if (act === "sick") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.SICK);
-              if (act === "work") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.WORK_MANUAL);
-              if (act === "clear") AbsenceService.clearAbsence(a.date);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="mono">${a.date}</td>
+      <td>${label}</td>
+      <td class="${a.auto ? "warn" : "muted"}">${a.auto ? "ja" : "nein"}</td>
+      <td class="${issue.hasIssue ? "warn" : "muted"}" title="${issue.hasIssue ? issue.text : ""}">
+        ${issueText}
+      </td>
+      <td>
+        <button class="btn secondary" data-act="time">Zeit</button>
+        <button class="btn secondary" data-act="vac">Urlaub</button>
+        <button class="btn secondary" data-act="sick">Krank</button>
+        <button class="btn secondary" data-act="work">Arbeit</button>
+        <button class="btn secondary" data-act="clear">Entfernen</button>
+      </td>
+    `;
 
-              renderAbsences();
-              renderCalendar();
-              renderAnalysis();
-              renderDaysStamps();
-            };
-          });
+    tr.querySelectorAll("button").forEach(btn => {
+      btn.onclick = () => {
+        const act = btn.getAttribute("data-act");
+        if (act === "time") { openModal(a.date); return; }
+        if (act === "vac") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.VACATION);
+        if (act === "sick") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.SICK);
+        if (act === "work") AbsenceService.setAbsence(a.date, AbsenceService.TYPES.WORK_MANUAL);
+        if (act === "clear") AbsenceService.clearAbsence(a.date);
 
-          tbody.appendChild(tr);
-        });
-      }
+        renderAbsences();
+        renderCalendar();
+        renderAnalysis();
+        renderDaysStamps();
+      };
+    });
+
+    tbody.appendChild(tr);
+  });
+}
+
 
       // ---------- Tage & Stempel ----------
       function getConflictForStamps(stampsForDay) {
