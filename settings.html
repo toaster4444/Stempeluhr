@@ -10,6 +10,14 @@
   <meta name="theme-color" content="#1f2933" />
 
   <link rel="stylesheet" href="src/css/style.css" />
+
+  <!-- Mobile: Navigation sinnvoll (Zurück = volle Breite) -->
+  <style>
+    @media (max-width: 640px) {
+      .topbar .nav { width:100%; }
+      .topbar .nav .btn, .topbar .nav a.btn { width:100%; text-align:center; }
+    }
+  </style>
 </head>
 <body>
 
@@ -21,7 +29,7 @@
 
     <nav class="nav">
       <a class="btn secondary" href="index.html">Zurück</a>
-      <a class="btn" href="toggle.html">Jetzt stempeln</a>
+      <!-- "Jetzt stempeln" ist hier bewusst entfernt -->
     </nav>
   </header>
 
@@ -163,22 +171,85 @@
 
       <div class="grid2">
         <div>
-          <label class="label" for="vacationAvailable">Verfügbare Urlaubstage</label>
+          <label class="label" for="vacationAvailable">Verfügbare Urlaubstage (aktuelles Jahr)</label>
           <input id="vacationAvailable" type="number" step="1" min="0" placeholder="z. B. 30"
                  style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
-          <p class="muted small">Wird später für Urlaubs-Tracking und Auswertungen genutzt.</p>
+          <p class="muted small">Wird für Urlaubs-Tracking und Auswertungen genutzt.</p>
         </div>
         <div>
           <label class="label">Hinweis</label>
           <p class="muted small" style="margin-top:0.3rem;">
-            Nicht gestempelte Soll-Tage werden später automatisch als Urlaub markiert und können nachträglich auf Krankheit oder Arbeit geändert werden.
+            Nicht gestempelte Soll-Tage werden automatisch als Urlaub markiert und können nachträglich auf Krankheit oder Arbeit geändert werden.
           </p>
+        </div>
+      </div>
+
+      <hr style="margin: 1rem 0; border:0; border-top:1px solid #eee;" />
+
+      <h3 style="margin:0 0 0.5rem; font-size:1rem;">Urlaub aus Vorjahr mitnehmen</h3>
+      <p class="muted small" style="margin-top:0;">
+        Nur beim Start wichtig: Trage ein, wie viele Tage aus dem Vorjahr noch verfügbar sind.
+        Beim Jahreswechsel wird ein ggf. verbleibender Rest automatisch übernommen.
+      </p>
+
+      <div class="grid2">
+        <div>
+          <label class="label" for="carryoverYear">Aus welchem Jahr?</label>
+          <input id="carryoverYear" type="number" step="1" min="2000" placeholder="z. B. 2025"
+                 style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+        </div>
+        <div>
+          <label class="label" for="carryoverDays">Wie viele Tage verfügbar?</label>
+          <input id="carryoverDays" type="number" step="0.5" min="0" placeholder="z. B. 3"
+                 style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
         </div>
       </div>
 
       <div class="row" style="margin-top:0.75rem;">
         <button class="btn" id="btnSaveVacation" type="button">Speichern</button>
         <span class="muted small" id="vacationSavedHint">–</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Geplanter Urlaub</h2>
+      <p class="muted small">
+        Trage genehmigte Urlaube ein: Wenn an diesen Tagen nicht gestempelt wird, werden sie direkt als Urlaub berücksichtigt.
+        Wenn du an einem geplanten Urlaubstag doch stempelst, wird der Urlaubstag automatisch wieder entfernt ("rückerstattet").
+      </p>
+
+      <div class="grid2">
+        <div>
+          <label class="label" for="pvFrom">Von (YYYY-MM-DD)</label>
+          <input id="pvFrom" type="text" placeholder="2026-02-10"
+                 style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+        </div>
+        <div>
+          <label class="label" for="pvTo">Bis (YYYY-MM-DD)</label>
+          <input id="pvTo" type="text" placeholder="2026-02-14"
+                 style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:0.75rem;">
+        <button class="btn" id="btnAddPlanned" type="button">Eintragen</button>
+        <button class="btn secondary" id="btnClearPlanned" type="button">Alle geplanten Urlaube löschen</button>
+        <span class="muted small" id="plannedHint">–</span>
+      </div>
+
+      <div class="table-wrap" style="margin-top:0.75rem;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Datum</th>
+              <th>Typ</th>
+              <th>Aktion</th>
+            </tr>
+          </thead>
+          <tbody id="plannedTbody">
+            <tr><td colspan="3" class="muted">Noch kein geplanter Urlaub</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
@@ -222,7 +293,31 @@
         const mo = Number(m[2]);
         const d = Number(m[3]);
         if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
-        return s;
+        return { y, mo, d, raw: s };
+      }
+
+      function pad2(n) { return String(n).padStart(2, "0"); }
+      function ymdFromDate(d) {
+        return `${String(d.getFullYear()).padStart(4, "0")}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+      }
+
+      function eachDayInclusive(fromStr, toStr) {
+        const a = parseDateYYYYMMDD(fromStr);
+        const b = parseDateYYYYMMDD(toStr);
+        if (!a || !b) return { ok: false, error: "Ungültiges Datum (YYYY-MM-DD)." };
+
+        const from = new Date(a.y, a.mo - 1, a.d, 0, 0, 0, 0);
+        const to = new Date(b.y, b.mo - 1, b.d, 0, 0, 0, 0);
+        if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return { ok: false, error: "Ungültiges Datum." };
+        if (to.getTime() < from.getTime()) return { ok: false, error: "Bis muss nach Von liegen." };
+
+        const out = [];
+        const cur = new Date(from.getTime());
+        while (cur.getTime() <= to.getTime()) {
+          out.push(ymdFromDate(cur));
+          cur.setDate(cur.getDate() + 1);
+        }
+        return { ok: true, days: out };
       }
 
       function renderWorkdays(settings) {
@@ -269,7 +364,7 @@
           return;
         }
 
-        list.slice().sort((a,b) => String(a.date).localeCompare(String(b.date))).forEach((item, idx) => {
+        list.slice().sort((a,b) => String(a.date).localeCompare(String(b.date))).forEach((item) => {
           const tr = document.createElement("tr");
 
           const tdDate = document.createElement("td");
@@ -288,8 +383,8 @@
           btn.addEventListener("click", () => {
             const s = getSettings();
             const cur = Array.isArray(s.customHolidays) ? s.customHolidays : [];
-            cur.splice(idx, 1);
-            saveSettings({ customHolidays: cur });
+            const next = cur.filter(x => x && x.date !== item.date);
+            saveSettings({ customHolidays: next });
             renderCustom(getSettings());
             setHint("customSavedHint", "Eintrag entfernt");
           });
@@ -339,6 +434,89 @@
         hint.textContent = "Lokale Feiertage werden zusätzlich zum Bundesland berücksichtigt.";
       }
 
+      // Planned vacation storage: absences with planned=true
+      function getPlannedAbsences() {
+        const abs = StorageService.getAbsences();
+        return (Array.isArray(abs) ? abs : [])
+          .filter(a => a && a.planned === true && a.type === "VACATION" && a.date)
+          .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      }
+
+      function upsertPlannedVacationDay(dateStr) {
+        StorageService.upsertAbsence({
+          date: dateStr,
+          type: "VACATION",
+          auto: false,
+          planned: true,
+          updatedAt: Date.now()
+        });
+      }
+
+      function removePlannedVacationDay(dateStr) {
+        const abs = StorageService.getAbsences();
+        const existing = (Array.isArray(abs) ? abs : []).find(a => a && a.date === dateStr);
+        if (existing && existing.planned === true) StorageService.removeAbsence(dateStr);
+      }
+
+      function addPlannedRange(fromStr, toStr) {
+        const res = eachDayInclusive(fromStr, toStr);
+        if (!res.ok) return res;
+
+        let count = 0;
+        res.days.forEach(ds => {
+          upsertPlannedVacationDay(ds);
+          count += 1;
+        });
+
+        return { ok: true, count };
+      }
+
+      function clearAllPlanned() {
+        const abs = StorageService.getAbsences();
+        (Array.isArray(abs) ? abs : []).forEach(a => {
+          if (a && a.planned === true && a.date) StorageService.removeAbsence(a.date);
+        });
+      }
+
+      function renderPlanned() {
+        const tbody = document.getElementById("plannedTbody");
+        tbody.innerHTML = "";
+
+        const list = getPlannedAbsences();
+        if (!list.length) {
+          tbody.innerHTML = `<tr><td colspan="3" class="muted">Noch kein geplanter Urlaub</td></tr>`;
+          return;
+        }
+
+        list.forEach(a => {
+          const tr = document.createElement("tr");
+
+          const tdDate = document.createElement("td");
+          tdDate.className = "mono";
+          tdDate.textContent = a.date;
+
+          const tdType = document.createElement("td");
+          tdType.textContent = "Urlaub (geplant)";
+
+          const tdAct = document.createElement("td");
+          const btn = document.createElement("button");
+          btn.className = "btn secondary";
+          btn.type = "button";
+          btn.textContent = "Entfernen";
+          btn.onclick = () => {
+            removePlannedVacationDay(a.date);
+            renderPlanned();
+            setHint("plannedHint", "Entfernt");
+          };
+          tdAct.appendChild(btn);
+
+          tr.appendChild(tdDate);
+          tr.appendChild(tdType);
+          tr.appendChild(tdAct);
+          tbody.appendChild(tr);
+        });
+      }
+
       function loadIntoForm() {
         const s = getSettings();
 
@@ -355,8 +533,15 @@
         document.getElementById("vacationAvailable").value =
           (typeof s.vacationAvailable === "number") ? s.vacationAvailable : "";
 
+        document.getElementById("carryoverYear").value =
+          (typeof s.carryoverYear === "number") ? s.carryoverYear : "";
+
+        document.getElementById("carryoverDays").value =
+          (typeof s.carryoverDays === "number") ? s.carryoverDays : "";
+
         renderWorkdays(s);
         renderCustom(s);
+        renderPlanned();
       }
 
       // React to state changes
@@ -364,7 +549,6 @@
         const state = e.target.value;
         const s = getSettings();
 
-        // Wenn das neue Bundesland keine lokalen Profile hat, setzen wir localProfile zurück
         const opts = getLocalProfilesForState(state);
         const hasProfiles = opts && opts.length > 1;
 
@@ -425,10 +609,10 @@
         const dateRaw = document.getElementById("customDate").value.trim();
         const factorRaw = document.getElementById("customFactor").value;
 
-        const date = parseDateYYYYMMDD(dateRaw);
+        const parsed = parseDateYYYYMMDD(dateRaw);
         const factor = Number(factorRaw);
 
-        if (!date) {
+        if (!parsed) {
           setHint("customSavedHint", "Ungültiges Datum (YYYY-MM-DD)");
           return;
         }
@@ -437,9 +621,11 @@
           return;
         }
 
+        const date = parsed.raw;
+
         const s = getSettings();
         const cur = Array.isArray(s.customHolidays) ? s.customHolidays : [];
-        const existingIdx = cur.findIndex(x => x.date === date);
+        const existingIdx = cur.findIndex(x => x && x.date === date);
         if (existingIdx >= 0) cur[existingIdx] = { date, factor };
         else cur.push({ date, factor });
 
@@ -456,21 +642,62 @@
         setHint("customSavedHint", "Alle personalisierten Feiertage gelöscht");
       });
 
-      // Save: Vacation available
+      // Save: Vacation + Carryover
       document.getElementById("btnSaveVacation").addEventListener("click", () => {
         const raw = document.getElementById("vacationAvailable").value;
-        if (raw === "") {
-          saveSettings({ vacationAvailable: null });
-          setHint("vacationSavedHint", "Gespeichert (leer)");
-          return;
+        const cyRaw = document.getElementById("carryoverYear").value;
+        const cdRaw = document.getElementById("carryoverDays").value;
+
+        const patch = {};
+
+        if (raw === "") patch.vacationAvailable = null;
+        else {
+          const n = Number(raw);
+          if (Number.isNaN(n) || n < 0) { setHint("vacationSavedHint", "Ungültige Urlaubstage"); return; }
+          patch.vacationAvailable = Math.floor(n);
         }
-        const n = Number(raw);
-        if (Number.isNaN(n) || n < 0) {
-          setHint("vacationSavedHint", "Ungültige Zahl");
-          return;
+
+        if (cyRaw === "") {
+          patch.carryoverYear = null;
+        } else {
+          const y = Number(cyRaw);
+          if (Number.isNaN(y) || y < 2000) { setHint("vacationSavedHint", "Ungültiges Jahr (Vorjahr)"); return; }
+          patch.carryoverYear = Math.floor(y);
         }
-        saveSettings({ vacationAvailable: Math.floor(n) });
+
+        if (cdRaw === "") {
+          patch.carryoverDays = null;
+          patch.carryoverRemaining = null;
+        } else {
+          const d = Number(cdRaw);
+          if (Number.isNaN(d) || d < 0) { setHint("vacationSavedHint", "Ungültige Vorjahres-Urlaubstage"); return; }
+          patch.carryoverDays = d;
+          // Beim erstmaligen Eintragen setzen wir den "Rest" gleich.
+          patch.carryoverRemaining = d;
+        }
+
+        saveSettings(patch);
         setHint("vacationSavedHint", "Gespeichert");
+      });
+
+      // Planned vacation actions
+      document.getElementById("btnAddPlanned").addEventListener("click", () => {
+        const from = document.getElementById("pvFrom").value.trim();
+        const to = document.getElementById("pvTo").value.trim();
+        const res = addPlannedRange(from, to || from);
+        if (!res.ok) { setHint("plannedHint", res.error); return; }
+        document.getElementById("pvFrom").value = "";
+        document.getElementById("pvTo").value = "";
+        renderPlanned();
+        setHint("plannedHint", `Eingetragen: ${res.count} Tag(e)`);
+      });
+
+      document.getElementById("btnClearPlanned").addEventListener("click", () => {
+        const ok = confirm("Wirklich ALLE geplanten Urlaube löschen?");
+        if (!ok) return;
+        clearAllPlanned();
+        renderPlanned();
+        setHint("plannedHint", "Alle geplanten Urlaube gelöscht");
       });
 
       // Reset
