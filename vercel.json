@@ -1,7 +1,7 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/src/pages/index.html" },
-    { "source": "/toggle", "destination": "/src/pages/toggle.html" },
-    { "source": "/settings", "destination": "/src/pages/settings.html" }
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/toggle", "destination": "/toggle.html" },
+    { "source": "/settings", "destination": "/settings.html" }
   ]
 }
