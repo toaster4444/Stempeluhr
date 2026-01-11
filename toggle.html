@@ -5,10 +5,10 @@
   <title>Stempeluhr – Stempeln</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <link rel="manifest" href="/public/manifest.json" />
+  <link rel="manifest" href="public/manifest.json" />
   <meta name="theme-color" content="#1f2933" />
 
-  <link rel="stylesheet" href="/src/css/style.css" />
+  <link rel="stylesheet" href="src/css/style.css" />
 </head>
 <body>
 
@@ -19,8 +19,8 @@
     </div>
 
     <nav class="nav">
-      <a class="btn secondary" href="/">Übersicht</a>
-      <a class="btn secondary" href="/settings">Einstellungen</a>
+      <a class="btn secondary" href="index.html">Übersicht</a>
+      <a class="btn secondary" href="settings.html">Einstellungen</a>
     </nav>
   </header>
 
@@ -43,7 +43,7 @@
         Bitte trage für diesen Tag die Arbeitszeit manuell nach. (Stempel-Rohdaten bleiben erhalten.)
       </p>
       <div class="row">
-        <a class="btn" id="cutoffLink" href="/">Zur Übersicht (Zeit nachtragen)</a>
+        <a class="btn" id="cutoffLink" href="index.html">Zur Übersicht (Zeit nachtragen)</a>
       </div>
     </section>
 
@@ -55,9 +55,9 @@
 
   </main>
 
-  <script src="/src/js/storage.js"></script>
-  <script src="/src/js/cutoff.js"></script>
-  <script src="/src/js/stamp_service.js"></script>
+  <script src="src/js/storage.js"></script>
+  <script src="src/js/cutoff.js"></script>
+  <script src="src/js/stamp_service.js"></script>
 
   <script>
     (function () {
@@ -101,7 +101,7 @@
           cutoffCard.style.display = "block";
           cutoffText.textContent = `Betroffenes Datum: ${res.dateStr} • ${res.reason}`;
           // Link zur Übersicht (dort kannst du per „Zeit“ nachtragen)
-          cutoffLink.href = "/";
+          cutoffLink.href = "index.html";
         } else {
           cutoffCard.style.display = "none";
         }
@@ -112,7 +112,7 @@
         runCutoff();
 
         const type = StampService.decideNextType({ cutoffHour: 3 });
-        const st = StampService.addStampNow(type);
+        StampService.addStampNow(type);
 
         // UI aktualisieren
         refreshUI();
