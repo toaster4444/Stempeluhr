@@ -10,9 +10,31 @@
 
   <link rel="stylesheet" href="src/css/style.css" />
 
-  <!-- Mobile-Feinschliff nur für diese Seite -->
+  <!-- Mobile-Optimierung nur für diese Seite -->
   <style>
-    /* Table für "Tage & Stempel" mobile-tauglicher */
+    /* Header / Buttons auf Mobile besser stapeln */
+    .topbar .nav { display:flex; gap:0.5rem; align-items:center; }
+    .topbar .nav .btn { white-space:nowrap; }
+
+    .topbar-sub {
+      margin-top: 0.6rem;
+      padding: 0.6rem 0.75rem;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    .topbar-sub .sub-row {
+      display:flex;
+      gap:0.75rem;
+      align-items:baseline;
+      justify-content:space-between;
+      flex-wrap:wrap;
+    }
+    .topbar-sub .laststamp {
+      font-weight: 600;
+    }
+
+    /* Tage & Stempel Tabelle: mobile-freundliche Zeilen */
     .days-table td { vertical-align: top; }
     .days-stamps-wrap { display:flex; flex-direction:column; gap:0.35rem; }
     .stamp-line { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; }
@@ -34,8 +56,18 @@
     .subrow-left { min-width: 200px; }
     .subrow-right { display:flex; gap:0.5rem; flex-wrap:wrap; }
 
-    /* Auf kleinen Screens Header ausblenden, weil jeder Tag 2 Zeilen hat */
+    /* Auf Mobile: Header kompakter, Buttons untereinander, Tabellen-Header für Tage ausblenden */
     @media (max-width: 640px) {
+      .topbar { padding-bottom: 0.75rem; }
+      .topbar .nav { width:100%; flex-direction:column; align-items:stretch; }
+      .topbar .nav .btn, .topbar .nav a.btn { width:100%; text-align:center; }
+
+      .topbar-sub { width:100%; }
+      .topbar-sub .sub-row { flex-direction:column; align-items:flex-start; gap:0.35rem; }
+
+      .container { padding-top: 0.75rem; }
+
+      /* Tage-Tabelle: Kopf ausblenden */
       .days-table thead { display:none; }
       .days-table td { padding: 0.6rem; }
       .subrow-box { flex-direction:column; align-items:stretch; }
@@ -55,6 +87,21 @@
       <button class="btn" id="btnStampNow" type="button">Jetzt stempeln</button>
       <a class="btn secondary" href="settings.html">Einstellungen</a>
     </nav>
+
+    <!-- NEU: Letzter Stempel direkt unter dem Button -->
+    <div class="topbar-sub" id="topbarLastStamp">
+      <div class="sub-row">
+        <div>
+          <div class="muted small">Letzter Stempel</div>
+          <div class="laststamp" id="lastStampTopValue">–</div>
+        </div>
+        <div>
+          <div class="muted small">Letzte Stempelung</div>
+          <div class="mono" id="lastStampTopAgo">–</div>
+        </div>
+      </div>
+      <div class="muted small" id="lastStampTopMeta" style="margin-top:0.25rem;">–</div>
+    </div>
   </header>
 
   <main class="container">
@@ -299,6 +346,17 @@
       function setHint(text) {
         const el = document.getElementById("exportHint");
         if (el) el.textContent = text;
+      }
+
+      function formatAgoFromTimestamp(ts) {
+        if (!ts || typeof ts !== "number") return "–";
+        const diffMs = Date.now() - ts;
+        if (diffMs < 0) return "–";
+        const totalMin = Math.floor(diffMs / 60000);
+        const hh = Math.floor(totalMin / 60);
+        const mm = totalMin % 60;
+        if (hh <= 0) return `vor ${mm} min`;
+        return `vor ${hh} h ${mm} min`;
       }
 
       function getIssueForDate(dateStr) {
@@ -567,7 +625,7 @@
         const month = now.getMonth(); // 0..11
         const monthNr = month + 1;
 
-        // ✅ Nur bis heute (keine Zukunftstage)
+        // Nur Tage bis heute (keine Zukunft)
         const maxDay = now.getDate();
 
         for (let d = 1; d <= maxDay; d++) {
@@ -581,7 +639,7 @@
           const manual = ManualWorkService.getByDate(dateStr);
           const conflict = getConflictForStamps(stampsForDay);
 
-          // --- Row 1: Datum + Stempel + Manuell
+          // Row 1
           const tr1 = document.createElement("tr");
 
           const dateCell = document.createElement("td");
@@ -680,7 +738,7 @@
           tr1.appendChild(stampCell);
           tr1.appendChild(manualCell);
 
-          // --- Row 2: Konflikt + Aktionen (Stempel+/Zeit) immer darunter
+          // Row 2 (Konflikt + Aktionen)
           const tr2 = document.createElement("tr");
           tr2.className = "days-subrow";
 
@@ -696,7 +754,6 @@
           const conflictLine = document.createElement("div");
           conflictLine.className = conflict.hasConflict ? "warn" : "muted";
           conflictLine.textContent = conflict.hasConflict ? ("⚠ " + conflict.text) : "–";
-
           left.appendChild(conflictLine);
 
           const right = document.createElement("div");
@@ -745,6 +802,7 @@
 
           box.appendChild(left);
           box.appendChild(right);
+
           td2.appendChild(box);
           tr2.appendChild(td2);
 
@@ -753,22 +811,39 @@
         }
       }
 
-      function renderMain() {
+      function renderMainAndLastStampTop() {
         const data = StorageService.getData();
         const stamps = data.stamps || [];
-        const last = stamps[stamps.length - 1];
+        const last = stamps[stamps.length - 1] || null;
 
+        // Bereich "Status" (unten)
         const lastStampValue = document.getElementById("lastStampValue");
         const lastStampMeta = document.getElementById("lastStampMeta");
+
+        // Bereich oben (neu)
+        const topValue = document.getElementById("lastStampTopValue");
+        const topAgo = document.getElementById("lastStampTopAgo");
+        const topMeta = document.getElementById("lastStampTopMeta");
 
         if (!last) {
           lastStampValue.textContent = "–";
           lastStampMeta.textContent = "Noch keine Stempel vorhanden";
+          topValue.textContent = "–";
+          topAgo.textContent = "–";
+          topMeta.textContent = "Noch keine Stempel vorhanden";
         } else {
-          lastStampValue.textContent = `${last.type} • ${formatDate(last)} ${formatTime(last)}`;
+          const valueText = `${last.type} • ${formatDate(last)} ${formatTime(last)}`;
+          const agoText = formatAgoFromTimestamp(last.timestamp);
+
+          lastStampValue.textContent = valueText;
           lastStampMeta.textContent = `timestamp: ${last.timestamp}${last.manualRequired ? " • ⚠️ manuell" : ""}`;
+
+          topValue.textContent = valueText;
+          topAgo.textContent = agoText;
+          topMeta.textContent = `${last.manualRequired ? "⚠️ Manuelle Prüfung markiert" : "OK"}`;
         }
 
+        // Hinweise (unten)
         const alerts = document.getElementById("alerts");
         alerts.innerHTML = "";
 
@@ -784,6 +859,7 @@
           });
         }
 
+        // Rohdaten (letzte 30)
         const tbody = document.getElementById("stampsTbody");
         tbody.innerHTML = "";
 
@@ -810,7 +886,7 @@
         renderCalendar();
         renderAbsences();
         renderDaysStamps();
-        renderMain();
+        renderMainAndLastStampTop();
       }
 
       // Buttons
@@ -831,7 +907,13 @@
       document.getElementById("btnExportCsv").onclick = () => { ExportService.exportStampsCSV({ delimiter: ";" }); setHint("CSV exportiert"); };
       document.getElementById("btnExportJson").onclick = () => { ExportService.exportAllJSON(); setHint("JSON exportiert"); };
 
+      // Initial
       renderAll();
+
+      // NEU: "vor xx" live aktualisieren
+      setInterval(() => {
+        renderMainAndLastStampTop();
+      }, 30000);
     })();
   </script>
 
