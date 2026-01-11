@@ -34,6 +34,23 @@
       font-weight: 600;
     }
 
+    /* Urlaub-Box in Auswertung */
+    .vac-box {
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      border-radius: 12px;
+      border: 1px solid #eee;
+      background: #fff;
+    }
+    .vac-grid {
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    @media (max-width: 640px) {
+      .vac-grid { grid-template-columns: 1fr; }
+    }
+
     /* Tage & Stempel Tabelle: mobile-freundliche Zeilen */
     .days-table td { vertical-align: top; }
     .days-stamps-wrap { display:flex; flex-direction:column; gap:0.35rem; }
@@ -88,7 +105,7 @@
       <a class="btn secondary" href="settings.html">Einstellungen</a>
     </nav>
 
-    <!-- NEU: Letzter Stempel direkt unter dem Button -->
+    <!-- Letzter Stempel direkt unter dem Button -->
     <div class="topbar-sub" id="topbarLastStamp">
       <div class="sub-row">
         <div>
@@ -161,6 +178,22 @@
           </div>
 
           <div class="muted small" style="margin-top:0.5rem;" id="monthFlags">–</div>
+        </div>
+      </div>
+
+      <!-- NEU: Jahresresturlaub -->
+      <div class="vac-box">
+        <div class="vac-grid">
+          <div>
+            <div class="label">Jahresresturlaub</div>
+            <div class="value" id="vacRemaining">–</div>
+            <div class="muted small" id="vacMeta">–</div>
+          </div>
+          <div>
+            <div class="label">Jahresresturlaub inkl. geplant</div>
+            <div class="value" id="vacRemainingPlanned">–</div>
+            <div class="muted small">Zukünftige geplante Urlaube sind abgezogen.</div>
+          </div>
         </div>
       </div>
     </section>
@@ -359,28 +392,143 @@
         return `vor ${hh} h ${mm} min`;
       }
 
-      function getIssueForDate(dateStr) {
+      // ---------- Urlaub: Soll-Anteil pro Tag (1.0 oder 0.5 etc.) ----------
+      function weekdayKey(d) {
+        const dow = d.getDay(); // 0..6
+        return dow === 1 ? "mon"
+          : dow === 2 ? "tue"
+          : dow === 3 ? "wed"
+          : dow === 4 ? "thu"
+          : dow === 5 ? "fri"
+          : dow === 6 ? "sat"
+          : "sun";
+      }
+
+      function getWorkdaysSafe(settings) {
+        const def = { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false };
+        const wd = settings && settings.workdays ? settings.workdays : def;
+        return { ...def, ...wd };
+      }
+
+      function customOffFactor(settings, dateStr) {
+        const list = Array.isArray(settings.customHolidays) ? settings.customHolidays : [];
+        const found = list.find(x => x && x.date === dateStr);
+        if (!found) return 0;
+        const f = Number(found.factor);
+        if (Number.isNaN(f) || f < 0) return 0;
+        return Math.min(1, f);
+      }
+
+      function legalOffFactor(settings, dateObj) {
+        if (!window.HolidaysService || !HolidaysService.getHolidayInfo) return 0;
+        const info = HolidaysService.getHolidayInfo(settings, dateObj);
+        return info && info.offFactor ? info.offFactor : 0;
+      }
+
+      function ymdFromDate(d) {
+        return `${String(d.getFullYear()).padStart(4, "0")}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+      }
+
+      // gibt requiredFraction zurück: 0 / 0.5 / 1 ...
+      function requiredWorkFraction(settings, workdays, dateObj) {
+        const key = weekdayKey(dateObj);
+        if (!workdays[key]) return 0;
+
+        const dateStr = ymdFromDate(dateObj);
+        const off = Math.max(
+          legalOffFactor(settings, dateObj),
+          customOffFactor(settings, dateStr)
+        );
+        const req = 1 - off;
+        return req > 0 ? req : 0;
+      }
+
+      function hasStampOnDate(stamps, dateStr) {
+        return (Array.isArray(stamps) ? stamps : []).some(s => {
+          if (!s || !s.year) return false;
+          const ds = `${s.year}-${pad2(s.month)}-${pad2(s.day)}`;
+          return ds === dateStr;
+        });
+      }
+
+      function formatDays(n) {
+        if (typeof n !== "number" || Number.isNaN(n)) return "–";
+        const rounded = Math.round(n * 10) / 10;
+        if (Math.abs(rounded - Math.round(rounded)) < 1e-9) return String(Math.round(rounded));
+        return rounded.toFixed(1);
+      }
+
+      function computeVacationStats() {
+        const settings = StorageService.getSettings() || {};
+        const workdays = getWorkdaysSafe(settings);
+
+        const totalYear = Number(settings.vacationAvailable || 0);
+        const carry = (typeof settings.carryoverRemaining === "number")
+          ? settings.carryoverRemaining
+          : (typeof settings.carryoverDays === "number" ? settings.carryoverDays : 0);
+
+        const totalEntitlement = Math.max(0, totalYear + Math.max(0, carry));
+
         const data = StorageService.getData();
         const stamps = Array.isArray(data.stamps) ? data.stamps : [];
-        const reasons = [];
+        const absences = Array.isArray(StorageService.getAbsences()) ? StorageService.getAbsences() : [];
 
-        for (const s of stamps) {
-          if (!s || !s.year) continue;
-          const ds = `${s.year}-${pad2(s.month)}-${pad2(s.day)}`;
-          if (ds !== dateStr) continue;
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const curYear = today.getFullYear();
 
-          if (s.cutoffFlag) reasons.push("Ausstempeln vergessen (03:00)");
-          if (s.manualRequired) reasons.push("Manuelle Prüfung nötig");
-        }
+        let usedSoFar = 0;
+        let plannedFuture = 0;
 
-        const last = stamps.length ? stamps[stamps.length - 1] : null;
-        if (last && last.type === "IN" && last.year) {
-          const lastDs = `${last.year}-${pad2(last.month)}-${pad2(last.day)}`;
-          if (lastDs === dateStr) reasons.push("Offener IN ohne OUT");
-        }
+        absences.forEach(a => {
+          if (!a || a.type !== "VACATION" || !a.date) return;
+          const m = String(a.date).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+          if (!m) return;
 
-        const uniq = Array.from(new Set(reasons));
-        return { hasIssue: uniq.length > 0, text: uniq.join(" • ") };
+          const y = Number(m[1]), mo = Number(m[2]), da = Number(m[3]);
+          if (y !== curYear) return;
+
+          const d = new Date(y, mo - 1, da, 0,0,0,0);
+          const dateStr = a.date;
+
+          // Wenn gestempelt wurde, zählt dieser Tag NICHT als Urlaub (refund)
+          if (hasStampOnDate(stamps, dateStr)) return;
+
+          const req = requiredWorkFraction(settings, workdays, d);
+          if (req <= 0) return;
+
+          if (d.getTime() <= today.getTime()) {
+            // bis heute: auto + manuell + geplant zählen -> verbraucht
+            usedSoFar += req;
+          } else {
+            // Zukunft: nur "geplant" soll abgezogen werden
+            if (a.planned === true) plannedFuture += req;
+          }
+        });
+
+        const remaining = Math.max(0, totalEntitlement - usedSoFar);
+        const remainingInclPlanned = Math.max(0, totalEntitlement - usedSoFar - plannedFuture);
+
+        return {
+          totalEntitlement,
+          usedSoFar,
+          plannedFuture,
+          remaining,
+          remainingInclPlanned
+        };
+      }
+
+      function renderVacationSummary() {
+        const elRem = document.getElementById("vacRemaining");
+        const elRemPl = document.getElementById("vacRemainingPlanned");
+        const elMeta = document.getElementById("vacMeta");
+
+        const s = computeVacationStats();
+        elRem.textContent = `${formatDays(s.remaining)} Tage`;
+        elRemPl.textContent = `${formatDays(s.remainingInclPlanned)} Tage`;
+
+        elMeta.textContent =
+          `Gesamt: ${formatDays(s.totalEntitlement)} • Verbraucht: ${formatDays(s.usedSoFar)} • Geplant (Zukunft): ${formatDays(s.plannedFuture)}`;
       }
 
       // ---------- Modal State ----------
@@ -511,6 +659,9 @@
         document.getElementById("monthDiff").textContent = Analytics.formatSignedDiff(summary.month.diffHours);
         document.getElementById("monthFlags").textContent =
           `Stempel-Hinweise: Manuell: ${summary.month.manualCount} • Offene IN: ${summary.month.openCount} • OUT ohne IN: ${summary.month.unmatchedOutCount}`;
+
+        // NEU
+        renderVacationSummary();
       }
 
       function renderCalendar() {
@@ -529,21 +680,18 @@
 
         list.forEach(a => {
           const label =
-            a.type === "VACATION" ? "Urlaub" :
+            a.type === "VACATION" ? (a.planned ? "Urlaub (geplant)" : "Urlaub") :
             a.type === "SICK" ? "Krank" :
             a.type === "WORK_MANUAL" ? "Arbeit (manuell)" : a.type;
 
-          const issue = getIssueForDate(a.date);
-          const issueText = issue.hasIssue ? ("⚠ " + issue.text) : "–";
+          const issueText = "–";
 
           const tr = document.createElement("tr");
           tr.innerHTML = `
             <td class="mono">${a.date}</td>
             <td>${label}</td>
             <td class="${a.auto ? "warn" : "muted"}">${a.auto ? "ja" : "nein"}</td>
-            <td class="${issue.hasIssue ? "warn" : "muted"}" title="${issue.hasIssue ? issue.text : ""}">
-              ${issueText}
-            </td>
+            <td class="muted">${issueText}</td>
             <td>
               <button class="btn secondary" data-act="time" type="button">Zeit</button>
               <button class="btn secondary" data-act="vac" type="button">Urlaub</button>
@@ -625,7 +773,6 @@
         const month = now.getMonth(); // 0..11
         const monthNr = month + 1;
 
-        // Nur Tage bis heute (keine Zukunft)
         const maxDay = now.getDate();
 
         for (let d = 1; d <= maxDay; d++) {
@@ -639,7 +786,6 @@
           const manual = ManualWorkService.getByDate(dateStr);
           const conflict = getConflictForStamps(stampsForDay);
 
-          // Row 1
           const tr1 = document.createElement("tr");
 
           const dateCell = document.createElement("td");
@@ -738,7 +884,6 @@
           tr1.appendChild(stampCell);
           tr1.appendChild(manualCell);
 
-          // Row 2 (Konflikt + Aktionen)
           const tr2 = document.createElement("tr");
           tr2.className = "days-subrow";
 
@@ -816,11 +961,9 @@
         const stamps = data.stamps || [];
         const last = stamps[stamps.length - 1] || null;
 
-        // Bereich "Status" (unten)
         const lastStampValue = document.getElementById("lastStampValue");
         const lastStampMeta = document.getElementById("lastStampMeta");
 
-        // Bereich oben (neu)
         const topValue = document.getElementById("lastStampTopValue");
         const topAgo = document.getElementById("lastStampTopAgo");
         const topMeta = document.getElementById("lastStampTopMeta");
@@ -843,7 +986,6 @@
           topMeta.textContent = `${last.manualRequired ? "⚠️ Manuelle Prüfung markiert" : "OK"}`;
         }
 
-        // Hinweise (unten)
         const alerts = document.getElementById("alerts");
         alerts.innerHTML = "";
 
@@ -859,7 +1001,6 @@
           });
         }
 
-        // Rohdaten (letzte 30)
         const tbody = document.getElementById("stampsTbody");
         tbody.innerHTML = "";
 
@@ -889,7 +1030,6 @@
         renderMainAndLastStampTop();
       }
 
-      // Buttons
       document.getElementById("btnStampNow").onclick = () => {
         const result = Clock.toggleStamp();
         setHint(`Gestempelt: ${result.type} • ${result.timeString}${result.manualRequired ? " • ⚠ manuell" : ""}`);
@@ -907,10 +1047,8 @@
       document.getElementById("btnExportCsv").onclick = () => { ExportService.exportStampsCSV({ delimiter: ";" }); setHint("CSV exportiert"); };
       document.getElementById("btnExportJson").onclick = () => { ExportService.exportAllJSON(); setHint("JSON exportiert"); };
 
-      // Initial
       renderAll();
 
-      // NEU: "vor xx" live aktualisieren
       setInterval(() => {
         renderMainAndLastStampTop();
       }, 30000);
