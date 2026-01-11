@@ -196,6 +196,21 @@
           </div>
         </div>
       </div>
+      
+      <div class="vac-box">
+        <div class="vac-grid">
+          <div>
+            <div class="label">Krankheitstage (Jahr)</div>
+            <div class="value" id="sickDaysYear">–</div>
+            <div class="muted small" id="sickMeta">–</div>
+          </div>
+          <div>
+            <div class="label">Einträge (Krank)</div>
+            <div class="value" id="sickEntries">–</div>
+            <div class="muted small">Anzahl der Krankheits-Einträge im aktuellen Jahr.</div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="card">
@@ -531,6 +546,58 @@
           `Gesamt: ${formatDays(s.totalEntitlement)} • Verbraucht: ${formatDays(s.usedSoFar)} • Geplant (Zukunft): ${formatDays(s.plannedFuture)}`;
       }
 
+      function computeSickStats() {
+        const settings = StorageService.getSettings() || {};
+        const workdays = getWorkdaysSafe(settings);
+
+        const data = StorageService.getData();
+        const stamps = Array.isArray(data.stamps) ? data.stamps : [];
+        const absences = Array.isArray(StorageService.getAbsences()) ? StorageService.getAbsences() : [];
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const curYear = today.getFullYear();
+
+        let sickDays = 0;
+        let sickEntries = 0;
+        let sickAutoDays = 0;
+
+        absences.forEach(a => {
+          if (!a || a.type !== "SICK" || !a.date) return;
+          const m = String(a.date).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+          if (!m) return;
+
+          const y = Number(m[1]), mo = Number(m[2]), da = Number(m[3]);
+          if (y !== curYear) return;
+
+          const d = new Date(y, mo - 1, da, 0,0,0,0);
+          const dateStr = a.date;
+
+          // Wenn gestempelt wurde, zählt dieser Tag nicht als Krankheitstag
+          if (hasStampOnDate(stamps, dateStr)) return;
+
+          const req = requiredWorkFraction(settings, workdays, d);
+          if (req <= 0) return;
+
+          sickEntries += 1;
+          sickDays += req;
+          if (a.auto) sickAutoDays += req;
+        });
+
+        return { sickDays, sickEntries, sickAutoDays };
+      }
+
+      function renderSickSummary() {
+        const elDays = document.getElementById("sickDaysYear");
+        const elEntries = document.getElementById("sickEntries");
+        const elMeta = document.getElementById("sickMeta");
+
+        const s = computeSickStats();
+        elDays.textContent = `${formatDays(s.sickDays)} Tage`;
+        elEntries.textContent = String(s.sickEntries);
+        elMeta.textContent = `Auto markiert: ${formatDays(s.sickAutoDays)} Tage`;
+      }
+
       // ---------- Modal State ----------
       let currentModalDate = null;
 
@@ -662,6 +729,7 @@
 
         // NEU
         renderVacationSummary();
+        renderSickSummary();
       }
 
       function renderCalendar() {
