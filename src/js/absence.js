@@ -1,6 +1,8 @@
 /**
  * absence.js
  * Automatische Urlaub/Krankheit-Logik (lokal)
+ * + planned-Vacation Unterstützung
+ * + "Rückerstattung": Wenn an einem geplanten Urlaubstag gestempelt wird, wird die geplante Abwesenheit entfernt
  */
 
 (function () {
@@ -43,7 +45,7 @@
   }
 
   function getSettingsSafe() {
-    return (window.StorageService && StorageService.getSettings())
+    return (window.StorageService && StorageService.getSettings)
       ? (StorageService.getSettings() || {})
       : {};
   }
@@ -79,20 +81,18 @@
       customOffFactor(settings, dateStr)
     );
 
-    // wenn off=1 -> komplett frei, off=0.5 -> halb frei => trotzdem "Solltag" vorhanden (reduziert)
-    // Für Auto-Urlaub gilt: wenn requiredFraction > 0 und NICHT gestempelt -> Urlaub.
+    // off=1 -> komplett frei, off=0.5 -> halb frei => Solltag vorhanden (reduziert)
     return (1 - off) > 0;
   }
 
   function stampsOnDate(stamps, dateStr) {
-    // einfacher Check: Datumsteile in Stamp vorhanden
     return stamps.some(s => s && s.year && s.month && s.day && `${s.year}-${pad2(s.month)}-${pad2(s.day)}` === dateStr);
   }
 
   function getAbsenceMap() {
     const abs = StorageService.getAbsences();
     const map = new Map();
-    abs.forEach(a => {
+    (Array.isArray(abs) ? abs : []).forEach(a => {
       if (a && a.date) map.set(a.date, a);
     });
     return map;
@@ -100,7 +100,9 @@
 
   /**
    * Automatisch Urlaub bis einschließlich "gestern" für Solltage ohne Stempel.
-   * Überschreibt keine manuellen Einträge.
+   * - Überschreibt keine manuellen Einträge.
+   * - planned Urlaub wird nicht überschrieben.
+   * - "Rückerstattung": Wenn gestempelt wurde, entfernen wir auto oder planned Abwesenheit.
    */
   function ensureAutoVacationUpToYesterday() {
     const data = StorageService.getData();
@@ -115,7 +117,7 @@
     const yesterday = new Date(today.getTime());
     yesterday.setDate(yesterday.getDate() - 1);
 
-    // wir prüfen: vom Monatsanfang bis gestern (aktueller Monat)
+    // vom Monatsanfang bis gestern (aktueller Monat)
     const start = startOfMonth(today);
     const endEx = new Date(yesterday.getTime());
     endEx.setDate(endEx.getDate() + 1);
@@ -131,19 +133,22 @@
         const hasStamp = stampsOnDate(stamps, dateStr);
         const existing = absMap.get(dateStr);
 
-        // Wenn gestempelt: auto-Abwesenheit entfernen (falls vorhanden)
+        // ✅ Wenn gestempelt: auto/planned Abwesenheit entfernen (Refund)
         if (hasStamp) {
-          if (existing && existing.auto === true) {
+          if (existing && (existing.auto === true || existing.planned === true)) {
             StorageService.removeAbsence(dateStr);
             absMap.delete(dateStr);
           }
         } else {
-          // keine Stempel: auto Urlaub setzen, sofern kein manuelles Override
+          // ✅ keine Stempel: auto Urlaub setzen, sofern kein Eintrag existiert
+          // - planned Urlaub bleibt bestehen (existing vorhanden)
+          // - manuelle Abwesenheit bleibt bestehen (existing vorhanden)
           if (!existing) {
             const rec = {
               date: dateStr,
               type: TYPES.VACATION,
               auto: true,
+              planned: false,
               updatedAt: Date.now()
             };
             StorageService.upsertAbsence(rec);
@@ -164,6 +169,23 @@
       date: dateStr,
       type,
       auto: false,
+      planned: false,
+      updatedAt: Date.now()
+    };
+    StorageService.upsertAbsence(rec);
+    return true;
+  }
+
+  // Optional: geplant setzen (für geplanten Urlaub)
+  function setPlannedVacation(dateStr) {
+    const d = parseYmd(dateStr);
+    if (!d) return false;
+
+    const rec = {
+      date: dateStr,
+      type: TYPES.VACATION,
+      auto: false,
+      planned: true,
       updatedAt: Date.now()
     };
     StorageService.upsertAbsence(rec);
@@ -180,7 +202,7 @@
     const endEx = endOfMonthExclusive(base);
 
     const abs = StorageService.getAbsences();
-    return abs
+    return (Array.isArray(abs) ? abs : [])
       .filter(a => a && a.date)
       .filter(a => {
         const d = parseYmd(a.date);
@@ -193,6 +215,7 @@
     TYPES,
     ensureAutoVacationUpToYesterday,
     setAbsence,
+    setPlannedVacation,
     clearAbsence,
     listAbsencesForMonth
   };
