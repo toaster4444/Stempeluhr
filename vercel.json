@@ -1,7 +1,16 @@
 {
-  "rewrites": [
-    { "source": "/", "destination": "/index.html" },
-    { "source": "/toggle", "destination": "/toggle.html" },
-    { "source": "/settings", "destination": "/settings.html" }
+  "version": 2,
+  "builds": [
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "settings.html", "use": "@vercel/static" },
+    { "src": "toggle.html", "use": "@vercel/static" },
+    { "src": "src/**", "use": "@vercel/static" },
+    { "src": "public/**", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "^/$", "dest": "/index.html" },
+    { "src": "^/settings/?$", "dest": "/settings.html" },
+    { "src": "^/toggle/?$", "dest": "/toggle.html" },
+    { "src": "^(?!/src/|/public/).*$", "dest": "/index.html" }
   ]
 }
