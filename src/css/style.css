@@ -95,6 +95,11 @@ a {
   background: #d1d5db;
 }
 
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* =========
    Cards
    ========= */
@@ -261,8 +266,29 @@ a {
   box-shadow: 0 -2px 6px rgba(0,0,0,0.25);
 }
 
-.install-banner span {
-  font-size: 0.95rem;
+.install-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.install-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #fff;
+  padding: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+.install-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.install-status {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .install-actions {
