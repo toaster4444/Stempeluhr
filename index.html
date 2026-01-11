@@ -19,7 +19,8 @@
     </div>
 
     <nav class="nav">
-      <a class="btn" href="toggle.html">Jetzt stempeln</a>
+      <!-- vorher: <a class="btn" href="toggle.html">Jetzt stempeln</a> -->
+      <button class="btn" id="btnStampNow" type="button">Jetzt stempeln</button>
       <a class="btn secondary" href="settings.html">Einstellungen</a>
     </nav>
   </header>
@@ -243,6 +244,9 @@
   </footer>
 
   <script src="src/js/storage.js"></script>
+  <!-- NEU: Stempel-Logik -->
+  <script src="src/js/clock.js"></script>
+
   <script src="src/js/export.js"></script>
 
   <script src="src/js/holidays.js"></script>
@@ -586,6 +590,13 @@
         renderManualWork();
         renderMain();
       }
+
+      // NEU: Jetzt stempeln direkt hier
+      document.getElementById("btnStampNow").onclick = () => {
+        const result = Clock.toggleStamp();
+        setHint(`Gestempelt: ${result.type} • ${result.timeString}${result.manualRequired ? " • ⚠ manuell" : ""}`);
+        renderAll();
+      };
 
       document.getElementById("btnRefresh").onclick = () => { renderAll(); setHint("Aktualisiert"); };
       document.getElementById("btnRecalc").onclick = () => { renderAnalysis(); renderCalendar(); };
