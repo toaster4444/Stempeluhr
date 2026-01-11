@@ -19,7 +19,6 @@
     </div>
 
     <nav class="nav">
-      <!-- vorher: <a class="btn" href="toggle.html">Jetzt stempeln</a> -->
       <button class="btn" id="btnStampNow" type="button">Jetzt stempeln</button>
       <a class="btn secondary" href="settings.html">Einstellungen</a>
     </nav>
@@ -122,29 +121,33 @@
       </div>
     </section>
 
+    <!-- NEU: Monats-Tagesliste statt "Manuelle Nachträge" -->
     <section class="card">
       <div class="row">
-        <h2>Manuelle Nachträge (aktueller Monat)</h2>
+        <h2>Tage & Stempel (aktueller Monat)</h2>
         <div class="row-right">
           <button class="btn secondary" id="btnManualRefresh" type="button">Aktualisieren</button>
         </div>
       </div>
+
+      <p class="muted small">
+        Hier siehst du alle Tage des Monats mit allen Stempeln (IN/OUT). Konflikte sind rot markiert.
+        Pro Tag kannst du Stempel hinzufügen, bearbeiten oder löschen. „Zeit“ öffnet den Arbeitszeit-Nachtrag.
+      </p>
 
       <div class="table-wrap">
         <table class="table">
           <thead>
             <tr>
               <th>Datum</th>
-              <th>Start</th>
-              <th>Ende</th>
-              <th>Pause (min)</th>
-              <th>Arbeitszeit (min)</th>
-              <th>Hinweis</th>
+              <th>Stempel (IN/OUT)</th>
+              <th>Manuell</th>
+              <th>⚠ Konflikt</th>
               <th>Aktionen</th>
             </tr>
           </thead>
-          <tbody id="manualTbody">
-            <tr><td colspan="7" class="muted">Keine</td></tr>
+          <tbody id="daysTbody">
+            <tr><td colspan="5" class="muted">Lade…</td></tr>
           </tbody>
         </table>
       </div>
@@ -244,7 +247,6 @@
   </footer>
 
   <script src="src/js/storage.js"></script>
-  <!-- NEU: Stempel-Logik -->
   <script src="src/js/clock.js"></script>
 
   <script src="src/js/export.js"></script>
@@ -269,8 +271,7 @@
         if (el) el.textContent = text;
       }
 
-      // ---------- Problem-Helper ----------
-      // Liefert { hasIssue:boolean, text:string } für ein Datum.
+      // ---------- Problem-Helper (für Absences-Tabelle) ----------
       function getIssueForDate(dateStr) {
         const data = StorageService.getData();
         const stamps = Array.isArray(data.stamps) ? data.stamps : [];
@@ -427,7 +428,7 @@
 
         document.getElementById("monthWorked").textContent = Analytics.formatHours(summary.month.workedHours);
         document.getElementById("monthManualAdded").textContent =
-          `Manuell gezählt: ${Analytics.formatHours(summary.month.manualHoursAdded)} h`;
+          `Manuell gezählt: ${Analytics.format attachment: ${Analytics.formatHours(summary.month.manualHoursAdded)} h`;
         document.getElementById("monthStampIgnored").textContent =
           `Stempel ignoriert (wegen manuell): ${Analytics.formatHours(summary.month.stampHoursIgnored)} h`;
 
@@ -488,6 +489,7 @@
               renderAbsences();
               renderCalendar();
               renderAnalysis();
+              renderDaysStamps();
             };
           });
 
@@ -495,40 +497,246 @@
         });
       }
 
-      function renderManualWork() {
-        const tbody = document.getElementById("manualTbody");
-        tbody.innerHTML = "";
+      // ---------- NEU: Tage & Stempel (aktueller Monat) ----------
+      function getConflictForStamps(stampsForDay) {
+        const stamps = (stampsForDay || []).slice().sort((a, b) => a.timestamp - b.timestamp);
+        const reasons = [];
 
-        const list = ManualWorkService.listForMonth(new Date());
-        if (!list.length) {
-          tbody.innerHTML = `<tr><td colspan="7" class="muted">Keine</td></tr>`;
-          return;
+        if (stamps.some(s => s && (s.manualRequired || s.cutoffFlag))) {
+          reasons.push("Manuelle Prüfung nötig");
         }
 
-        list.forEach(e => {
-          const stampHint = hasAnyStampOnDate(e.date)
-            ? "Stempel vorhanden (ignoriert in Auswertung)"
-            : "–";
+        // doppelte Typen hintereinander (IN/IN oder OUT/OUT)
+        for (let i = 1; i < stamps.length; i++) {
+          if (stamps[i] && stamps[i - 1] && stamps[i].type === stamps[i - 1].type) {
+            reasons.push("Doppelter Typ (z.B. IN/IN)");
+            break;
+          }
+        }
+
+        // Offenes IN oder OUT ohne IN (sehr simple Heuristik)
+        const inCount = stamps.filter(s => s && s.type === "IN").length;
+        const outCount = stamps.filter(s => s && s.type === "OUT").length;
+        if (inCount !== outCount) {
+          reasons.push(inCount > outCount ? "Offenes IN ohne OUT" : "OUT ohne IN");
+        }
+
+        const uniq = Array.from(new Set(reasons));
+        return { hasConflict: uniq.length > 0, text: uniq.join(" • ") };
+      }
+
+      function promptHHMM(defaultValue) {
+        const v = prompt("Uhrzeit (HH:MM):", defaultValue || "");
+        if (v === null) return null;
+        const m = String(v).trim().match(/^(\d{1,2}):(\d{2})$/);
+        if (!m) return { ok: false, error: "Ungültiges Format. Bitte HH:MM." };
+        const hh = Number(m[1]), mm = Number(m[2]);
+        if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return { ok: false, error: "Ungültige Uhrzeit." };
+        return { ok: true, hh, mm, raw: `${pad2(hh)}:${pad2(mm)}` };
+      }
+
+      function promptType(defaultType) {
+        const v = prompt('Typ ("IN" oder "OUT"):', defaultType || "IN");
+        if (v === null) return null;
+        const t = String(v).trim().toUpperCase();
+        if (t !== "IN" && t !== "OUT") return { ok: false, error: 'Nur "IN" oder "OUT" erlaubt.' };
+        return { ok: true, type: t };
+      }
+
+      function renderDaysStamps() {
+        const tbody = document.getElementById("daysTbody");
+        tbody.innerHTML = "";
+
+        const data = StorageService.getData();
+        const stampsAll = Array.isArray(data.stamps) ? data.stamps : [];
+
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth(); // 0..11
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        const monthNr = month + 1;
+
+        for (let d = 1; d <= lastDay; d++) {
+          const dateStr = `${year}-${pad2(monthNr)}-${pad2(d)}`;
+
+          const stampsForDay = stampsAll
+            .filter(s => s && s.year === year && s.month === monthNr && s.day === d)
+            .slice()
+            .sort((a, b) => a.timestamp - b.timestamp);
+
+          const manual = ManualWorkService.getByDate(dateStr);
+
+          const conflict = getConflictForStamps(stampsForDay);
 
           const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td class="mono">${e.date}</td>
-            <td>${e.start}</td>
-            <td>${e.end}</td>
-            <td>${e.breakMinutes}</td>
-            <td>${e.minutesWorked}</td>
-            <td class="${stampHint !== "–" ? "warn" : "muted"}">${stampHint}</td>
-            <td>
-              <button class="btn secondary" data-act="edit">Bearbeiten</button>
-              <button class="btn secondary" data-act="del">Löschen</button>
-            </td>
-          `;
 
-          tr.querySelector('[data-act="edit"]').onclick = () => openModal(e.date);
-          tr.querySelector('[data-act="del"]').onclick = () => { ManualWorkService.remove(e.date); renderAll(); };
+          // Stempel-Zelleninhalt (mit kleinen Buttons pro Stempel)
+          const stampCell = document.createElement("td");
+          stampCell.style.whiteSpace = "normal";
+
+          if (!stampsForDay.length) {
+            stampCell.innerHTML = `<span class="muted">–</span>`;
+          } else {
+            const wrap = document.createElement("div");
+            wrap.style.display = "flex";
+            wrap.style.flexDirection = "column";
+            wrap.style.gap = "0.35rem";
+
+            stampsForDay.forEach(st => {
+              const line = document.createElement("div");
+              line.style.display = "flex";
+              line.style.alignItems = "center";
+              line.style.gap = "0.5rem";
+              line.style.flexWrap = "wrap";
+
+              const label = document.createElement("span");
+              label.className = (st.manualRequired || st.cutoffFlag) ? "warn mono" : "mono";
+              label.textContent = `${st.type} ${pad2(st.hour)}:${pad2(st.minute)}:${pad2(st.second)}`;
+
+              const btnEdit = document.createElement("button");
+              btnEdit.className = "btn secondary";
+              btnEdit.type = "button";
+              btnEdit.style.padding = "0.2rem 0.45rem";
+              btnEdit.textContent = "Bearbeiten";
+              btnEdit.onclick = () => {
+                const tRes = promptType(st.type);
+                if (!tRes) return;
+                if (!tRes.ok) { alert(tRes.error); return; }
+
+                const timeRes = promptHHMM(`${pad2(st.hour)}:${pad2(st.minute)}`);
+                if (!timeRes) return;
+                if (!timeRes.ok) { alert(timeRes.error); return; }
+
+                const newDate = new Date(year, month, d, timeRes.hh, timeRes.mm, 0, 0);
+                const newTs = newDate.getTime();
+                const newIso = newDate.toISOString();
+
+                StorageService.updateStampByTimestamp(st.timestamp, {
+                  type: tRes.type,
+                  hour: timeRes.hh,
+                  minute: timeRes.mm,
+                  second: 0,
+                  timestamp: newTs,
+                  iso: newIso,
+                  year,
+                  month: monthNr,
+                  day: d,
+                  manualRequired: false,
+                  cutoffFlag: false
+                });
+
+                renderAll();
+                setHint(`Stempel geändert: ${dateStr} ${tRes.type} ${timeRes.raw}`);
+              };
+
+              const btnDel = document.createElement("button");
+              btnDel.className = "btn secondary";
+              btnDel.type = "button";
+              btnDel.style.padding = "0.2rem 0.45rem";
+              btnDel.textContent = "Löschen";
+              btnDel.onclick = () => {
+                const ok = confirm(`Diesen Stempel wirklich löschen?\n${st.type} ${pad2(st.hour)}:${pad2(st.minute)}:${pad2(st.second)} (${dateStr})`);
+                if (!ok) return;
+                StorageService.deleteStampByTimestamp(st.timestamp);
+                renderAll();
+                setHint(`Stempel gelöscht: ${dateStr}`);
+              };
+
+              line.appendChild(label);
+              if (st.manualRequired || st.cutoffFlag) {
+                const flag = document.createElement("span");
+                flag.className = "warn small";
+                flag.textContent = "⚠ manuell";
+                line.appendChild(flag);
+              }
+              line.appendChild(btnEdit);
+              line.appendChild(btnDel);
+
+              wrap.appendChild(line);
+            });
+
+            stampCell.appendChild(wrap);
+          }
+
+          // Manuell-Zelle
+          const manualCell = document.createElement("td");
+          if (!manual) {
+            manualCell.innerHTML = `<span class="muted">–</span>`;
+          } else {
+            manualCell.innerHTML =
+              `<span class="mono">${manual.start}–${manual.end}</span>
+               <span class="muted small"> • Pause ${manual.breakMinutes} • ${manual.minutesWorked} min</span>`;
+          }
+
+          // Konflikt-Zelle
+          const conflictCell = document.createElement("td");
+          conflictCell.className = conflict.hasConflict ? "warn" : "muted";
+          conflictCell.textContent = conflict.hasConflict ? `⚠ ${conflict.text}` : "–";
+
+          // Aktionen-Zelle (pro Tag)
+          const actionsCell = document.createElement("td");
+
+          const btnAdd = document.createElement("button");
+          btnAdd.className = "btn secondary";
+          btnAdd.type = "button";
+          btnAdd.textContent = "Stempel +";
+          btnAdd.onclick = () => {
+            const tRes = promptType("IN");
+            if (!tRes) return;
+            if (!tRes.ok) { alert(tRes.error); return; }
+
+            const timeRes = promptHHMM("08:00");
+            if (!timeRes) return;
+            if (!timeRes.ok) { alert(timeRes.error); return; }
+
+            const dt = new Date(year, month, d, timeRes.hh, timeRes.mm, 0, 0);
+            const stamp = {
+              type: tRes.type,
+              iso: dt.toISOString(),
+              year,
+              month: monthNr,
+              day: d,
+              hour: timeRes.hh,
+              minute: timeRes.mm,
+              second: 0,
+              timestamp: dt.getTime(),
+              manualRequired: false,
+              cutoffFlag: false
+            };
+
+            StorageService.addStamp(stamp);
+            renderAll();
+            setHint(`Stempel hinzugefügt: ${dateStr} ${tRes.type} ${timeRes.raw}`);
+          };
+
+          const btnTime = document.createElement("button");
+          btnTime.className = "btn secondary";
+          btnTime.type = "button";
+          btnTime.textContent = "Zeit";
+          btnTime.onclick = () => openModal(dateStr);
+
+          actionsCell.appendChild(btnAdd);
+          actionsCell.appendChild(document.createTextNode(" "));
+          actionsCell.appendChild(btnTime);
+
+          // Datum-Zelle
+          const dateCell = document.createElement("td");
+          dateCell.className = "mono";
+          dateCell.textContent = dateStr;
+
+          tr.appendChild(dateCell);
+          tr.appendChild(stampCell);
+          tr.appendChild(manualCell);
+          tr.appendChild(conflictCell);
+          tr.appendChild(actionsCell);
+
+          // optional: ganze Zeile rot markieren, wenn Konflikt
+          if (conflict.hasConflict) {
+            tr.className = "warn";
+          }
 
           tbody.appendChild(tr);
-        });
+        }
       }
 
       function renderMain() {
@@ -587,11 +795,11 @@
         renderAnalysis();
         renderCalendar();
         renderAbsences();
-        renderManualWork();
+        renderDaysStamps();
         renderMain();
       }
 
-      // NEU: Jetzt stempeln direkt hier
+      // Jetzt stempeln
       document.getElementById("btnStampNow").onclick = () => {
         const result = Clock.toggleStamp();
         setHint(`Gestempelt: ${result.type} • ${result.timeString}${result.manualRequired ? " • ⚠ manuell" : ""}`);
@@ -600,8 +808,8 @@
 
       document.getElementById("btnRefresh").onclick = () => { renderAll(); setHint("Aktualisiert"); };
       document.getElementById("btnRecalc").onclick = () => { renderAnalysis(); renderCalendar(); };
-      document.getElementById("btnAbsRefresh").onclick = () => { AbsenceService.ensureAutoVacationUpToYesterday(); renderAbsences(); renderCalendar(); };
-      document.getElementById("btnManualRefresh").onclick = () => { renderManualWork(); renderAnalysis(); };
+      document.getElementById("btnAbsRefresh").onclick = () => { AbsenceService.ensureAutoVacationUpToYesterday(); renderAbsences(); renderCalendar(); renderAnalysis(); renderDaysStamps(); };
+      document.getElementById("btnManualRefresh").onclick = () => { renderDaysStamps(); renderAnalysis(); setHint("Tage aktualisiert"); };
 
       document.getElementById("btnExportCsv").onclick = () => { ExportService.exportStampsCSV({ delimiter: ";" }); setHint("CSV exportiert"); };
       document.getElementById("btnExportJson").onclick = () => { ExportService.exportAllJSON(); setHint("JSON exportiert"); };
