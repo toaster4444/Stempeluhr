@@ -6,10 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <!-- PWA / App-Icons -->
-  <link rel="manifest" href="/public/manifest.json" />
+  <link rel="manifest" href="public/manifest.json" />
   <meta name="theme-color" content="#1f2933" />
 
-  <link rel="stylesheet" href="/src/css/style.css" />
+  <link rel="stylesheet" href="src/css/style.css" />
 </head>
 <body>
 
@@ -20,8 +20,8 @@
     </div>
 
     <nav class="nav">
-      <a class="btn secondary" href="/">Zurück</a>
-      <a class="btn" href="/toggle">Jetzt stempeln</a>
+      <a class="btn secondary" href="index.html">Zurück</a>
+      <a class="btn" href="toggle.html">Jetzt stempeln</a>
     </nav>
   </header>
 
@@ -192,7 +192,7 @@
 
   </main>
 
-  <script src="/src/js/storage.js"></script>
+  <script src="src/js/storage.js"></script>
 
   <script>
     (function () {
@@ -360,21 +360,20 @@
       }
 
       // React to state changes
-     document.getElementById("stateSelect").addEventListener("change", (e) => {
-  const state = e.target.value;
-  const s = getSettings();
+      document.getElementById("stateSelect").addEventListener("change", (e) => {
+        const state = e.target.value;
+        const s = getSettings();
 
-  // Wenn das neue Bundesland keine lokalen Profile hat, setzen wir localProfile zurück
-  const opts = getLocalProfilesForState(state);
-  const hasProfiles = opts && opts.length > 1;
+        // Wenn das neue Bundesland keine lokalen Profile hat, setzen wir localProfile zurück
+        const opts = getLocalProfilesForState(state);
+        const hasProfiles = opts && opts.length > 1;
 
-  if (!hasProfiles && s.localProfile) {
-    saveSettings({ localProfile: "" });
-  }
+        if (!hasProfiles && s.localProfile) {
+          saveSettings({ localProfile: "" });
+        }
 
-  renderLocalProfileUI(state, getSettings());
-});
-
+        renderLocalProfileUI(state, getSettings());
+      });
 
       // Save: Hours/Percent
       document.getElementById("btnSaveHours").addEventListener("click", () => {
