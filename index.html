@@ -121,7 +121,6 @@
       </div>
     </section>
 
-    <!-- NEU: Monats-Tagesliste statt "Manuelle Nachträge" -->
     <section class="card">
       <div class="row">
         <h2>Tage & Stempel (aktueller Monat)</h2>
@@ -271,7 +270,6 @@
         if (el) el.textContent = text;
       }
 
-      // ---------- Problem-Helper (für Absences-Tabelle) ----------
       function getIssueForDate(dateStr) {
         const data = StorageService.getData();
         const stamps = Array.isArray(data.stamps) ? data.stamps : [];
@@ -428,7 +426,7 @@
 
         document.getElementById("monthWorked").textContent = Analytics.formatHours(summary.month.workedHours);
         document.getElementById("monthManualAdded").textContent =
-          `Manuell gezählt: ${Analytics.format attachment: ${Analytics.formatHours(summary.month.manualHoursAdded)} h`;
+          `Manuell gezählt: ${Analytics.formatHours(summary.month.manualHoursAdded)} h`;
         document.getElementById("monthStampIgnored").textContent =
           `Stempel ignoriert (wegen manuell): ${Analytics.formatHours(summary.month.stampHoursIgnored)} h`;
 
@@ -497,7 +495,7 @@
         });
       }
 
-      // ---------- NEU: Tage & Stempel (aktueller Monat) ----------
+      // ---------- Tage & Stempel ----------
       function getConflictForStamps(stampsForDay) {
         const stamps = (stampsForDay || []).slice().sort((a, b) => a.timestamp - b.timestamp);
         const reasons = [];
@@ -506,7 +504,6 @@
           reasons.push("Manuelle Prüfung nötig");
         }
 
-        // doppelte Typen hintereinander (IN/IN oder OUT/OUT)
         for (let i = 1; i < stamps.length; i++) {
           if (stamps[i] && stamps[i - 1] && stamps[i].type === stamps[i - 1].type) {
             reasons.push("Doppelter Typ (z.B. IN/IN)");
@@ -514,7 +511,6 @@
           }
         }
 
-        // Offenes IN oder OUT ohne IN (sehr simple Heuristik)
         const inCount = stamps.filter(s => s && s.type === "IN").length;
         const outCount = stamps.filter(s => s && s.type === "OUT").length;
         if (inCount !== outCount) {
@@ -565,12 +561,15 @@
             .sort((a, b) => a.timestamp - b.timestamp);
 
           const manual = ManualWorkService.getByDate(dateStr);
-
           const conflict = getConflictForStamps(stampsForDay);
 
           const tr = document.createElement("tr");
+          if (conflict.hasConflict) tr.className = "warn";
 
-          // Stempel-Zelleninhalt (mit kleinen Buttons pro Stempel)
+          const dateCell = document.createElement("td");
+          dateCell.className = "mono";
+          dateCell.textContent = dateStr;
+
           const stampCell = document.createElement("td");
           stampCell.style.whiteSpace = "normal";
 
@@ -608,16 +607,13 @@
                 if (!timeRes.ok) { alert(timeRes.error); return; }
 
                 const newDate = new Date(year, month, d, timeRes.hh, timeRes.mm, 0, 0);
-                const newTs = newDate.getTime();
-                const newIso = newDate.toISOString();
-
                 StorageService.updateStampByTimestamp(st.timestamp, {
                   type: tRes.type,
                   hour: timeRes.hh,
                   minute: timeRes.mm,
                   second: 0,
-                  timestamp: newTs,
-                  iso: newIso,
+                  timestamp: newDate.getTime(),
+                  iso: newDate.toISOString(),
                   year,
                   month: monthNr,
                   day: d,
@@ -658,7 +654,6 @@
             stampCell.appendChild(wrap);
           }
 
-          // Manuell-Zelle
           const manualCell = document.createElement("td");
           if (!manual) {
             manualCell.innerHTML = `<span class="muted">–</span>`;
@@ -668,12 +663,10 @@
                <span class="muted small"> • Pause ${manual.breakMinutes} • ${manual.minutesWorked} min</span>`;
           }
 
-          // Konflikt-Zelle
           const conflictCell = document.createElement("td");
           conflictCell.className = conflict.hasConflict ? "warn" : "muted";
           conflictCell.textContent = conflict.hasConflict ? `⚠ ${conflict.text}` : "–";
 
-          // Aktionen-Zelle (pro Tag)
           const actionsCell = document.createElement("td");
 
           const btnAdd = document.createElement("button");
@@ -690,7 +683,7 @@
             if (!timeRes.ok) { alert(timeRes.error); return; }
 
             const dt = new Date(year, month, d, timeRes.hh, timeRes.mm, 0, 0);
-            const stamp = {
+            StorageService.addStamp({
               type: tRes.type,
               iso: dt.toISOString(),
               year,
@@ -702,9 +695,8 @@
               timestamp: dt.getTime(),
               manualRequired: false,
               cutoffFlag: false
-            };
+            });
 
-            StorageService.addStamp(stamp);
             renderAll();
             setHint(`Stempel hinzugefügt: ${dateStr} ${tRes.type} ${timeRes.raw}`);
           };
@@ -719,21 +711,11 @@
           actionsCell.appendChild(document.createTextNode(" "));
           actionsCell.appendChild(btnTime);
 
-          // Datum-Zelle
-          const dateCell = document.createElement("td");
-          dateCell.className = "mono";
-          dateCell.textContent = dateStr;
-
           tr.appendChild(dateCell);
           tr.appendChild(stampCell);
           tr.appendChild(manualCell);
           tr.appendChild(conflictCell);
           tr.appendChild(actionsCell);
-
-          // optional: ganze Zeile rot markieren, wenn Konflikt
-          if (conflict.hasConflict) {
-            tr.className = "warn";
-          }
 
           tbody.appendChild(tr);
         }
@@ -808,7 +790,10 @@
 
       document.getElementById("btnRefresh").onclick = () => { renderAll(); setHint("Aktualisiert"); };
       document.getElementById("btnRecalc").onclick = () => { renderAnalysis(); renderCalendar(); };
-      document.getElementById("btnAbsRefresh").onclick = () => { AbsenceService.ensureAutoVacationUpToYesterday(); renderAbsences(); renderCalendar(); renderAnalysis(); renderDaysStamps(); };
+      document.getElementById("btnAbsRefresh").onclick = () => {
+        AbsenceService.ensureAutoVacationUpToYesterday();
+        renderAbsences(); renderCalendar(); renderAnalysis(); renderDaysStamps();
+      };
       document.getElementById("btnManualRefresh").onclick = () => { renderDaysStamps(); renderAnalysis(); setHint("Tage aktualisiert"); };
 
       document.getElementById("btnExportCsv").onclick = () => { ExportService.exportStampsCSV({ delimiter: ";" }); setHint("CSV exportiert"); };
