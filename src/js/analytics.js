@@ -143,12 +143,17 @@
     return null;
   }
 
-  function getDailyHoursFromSettings(settings, selectedDaysPerWeek) {
-    const weekly = getWeeklyHoursFromSettings(settings);
-    if (weekly !== null && selectedDaysPerWeek > 0) return weekly / selectedDaysPerWeek;
-    const daily = Number(settings && settings.standardDailyHours);
-    if (!Number.isNaN(daily) && daily > 0) return daily;
-    return null;
+  function getDailyHoursByDay(settings) {
+    const def = { mon: 8, tue: 8, wed: 8, thu: 8, fri: 8, sat: 0, sun: 0 };
+    const src = (settings && settings.standardDailyHoursByDay && typeof settings.standardDailyHoursByDay === "object")
+      ? settings.standardDailyHoursByDay
+      : {};
+    const out = { ...def };
+    Object.keys(def).forEach(k => {
+      const v = Number(src[k]);
+      if (!Number.isNaN(v) && v >= 0) out[k] = v;
+    });
+    return out;
   }
 
   function customHolidayFactorForDate(settings, dateStr) {
@@ -166,8 +171,8 @@
     return info && info.offFactor ? info.offFactor : 0;
   }
 
-  function computeTargetHoursForRange(settings, workdays, dailyTarget, start, endExclusive) {
-    if (dailyTarget === null || dailyTarget === undefined) return null;
+  function computeTargetHoursForRange(settings, workdays, dailyTarget, dailyTargetByDay, start, endExclusive) {
+    if ((dailyTarget === null || dailyTarget === undefined) && !dailyTargetByDay) return null;
 
     let target = 0;
     const d = new Date(start.getTime());
@@ -184,7 +189,10 @@
         const offFactor = Math.max(legalOff, customOff);
         const requiredFraction = 1 - offFactor;
 
-        target += dailyTarget * requiredFraction;
+        const targetForDay = (dailyTarget !== null && dailyTarget !== undefined)
+          ? dailyTarget
+          : Number(dailyTargetByDay ? dailyTargetByDay[key] : 0);
+        target += targetForDay * requiredFraction;
       }
 
       d.setDate(d.getDate() + 1);
@@ -322,13 +330,22 @@
     const monthWorked = sumWithOverride(monthStamp.dateMs, monthManualByDate);
 
     // targets
-    const dailyTarget = getDailyHoursFromSettings(settings, selectedDaysPerWeek);
+    let dailyTarget = null;
+    let dailyTargetByDay = null;
+    if (weeklyHours !== null && selectedDaysPerWeek > 0) {
+      dailyTarget = weeklyHours / selectedDaysPerWeek;
+    } else {
+      dailyTargetByDay = getDailyHoursByDay(settings);
+    }
+
     const weeklyHoursEffective = (weeklyHours !== null && selectedDaysPerWeek > 0)
       ? weeklyHours
-      : (dailyTarget !== null ? dailyTarget * selectedDaysPerWeek : null);
+      : (dailyTargetByDay
+        ? Object.keys(dailyTargetByDay).reduce((sum, k) => sum + (workdays[k] ? dailyTargetByDay[k] : 0), 0)
+        : null);
 
-    const weekTarget = computeTargetHoursForRange(settings, workdays, dailyTarget, wStart, wEnd);
-    const monthTarget = computeTargetHoursForRange(settings, workdays, dailyTarget, mStart, mEnd);
+    const weekTarget = computeTargetHoursForRange(settings, workdays, dailyTarget, dailyTargetByDay, wStart, wEnd);
+    const monthTarget = computeTargetHoursForRange(settings, workdays, dailyTarget, dailyTargetByDay, mStart, mEnd);
 
     const weekDiff = (weekTarget !== null) ? (weekWorked.workedHours - weekTarget) : null;
     const monthDiff = (monthTarget !== null) ? (monthWorked.workedHours - monthTarget) : null;

@@ -20,7 +20,7 @@
         vacationYearLastSeen: null,
 
         // Arbeitszeit
-        standardDailyHours: 8,
+        standardDailyHoursByDay: { mon: 8, tue: 8, wed: 8, thu: 8, fri: 8, sat: 0, sun: 0 },
 
         // Urlaub
         vacationAvailable: null,      // Anspruch aktuelles Jahr (z. B. 30)
@@ -74,8 +74,28 @@
     if (!Array.isArray(merged.settings.customHolidays)) merged.settings.customHolidays = [];
 
     // Arbeitszeit-Defaults absichern
-    const daily = Number(merged.settings.standardDailyHours);
-    if (Number.isNaN(daily) || daily <= 0) merged.settings.standardDailyHours = base.settings.standardDailyHours;
+    const dailyKeys = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+    const baseDaily = base.settings.standardDailyHoursByDay;
+    let dailyByDay = (merged.settings.standardDailyHoursByDay && typeof merged.settings.standardDailyHoursByDay === "object")
+      ? merged.settings.standardDailyHoursByDay
+      : null;
+    if (!dailyByDay) {
+      const oldDaily = Number(merged.settings.standardDailyHours);
+      if (!Number.isNaN(oldDaily) && oldDaily > 0) {
+        dailyByDay = {};
+        dailyKeys.forEach(k => { dailyByDay[k] = oldDaily; });
+      }
+    }
+    const normalizedDaily = { ...baseDaily };
+    if (dailyByDay) {
+      dailyKeys.forEach(k => {
+        const v = Number(dailyByDay[k]);
+        if (!Number.isNaN(v) && v >= 0) normalizedDaily[k] = v;
+      });
+    }
+    merged.settings.standardDailyHoursByDay = normalizedDaily;
+    if (merged.settings.standardDailyHours !== undefined) delete merged.settings.standardDailyHours;
+
     const vacHours = Number(merged.settings.vacationDayHours);
     if (Number.isNaN(vacHours) || vacHours <= 0) merged.settings.vacationDayHours = base.settings.vacationDayHours;
 
@@ -148,24 +168,23 @@
     return info && info.offFactor ? info.offFactor : 0;
   }
 
-  function getWeeklyHoursFromSettings(settings) {
-    if (settings && typeof settings.weeklyHours === "number") return settings.weeklyHours;
-    if (settings && typeof settings.weeklyPercent === "number") return (settings.weeklyPercent / 100) * 40;
-    return null;
+  function getDailyHoursByDay(settings) {
+    const def = { mon: 8, tue: 8, wed: 8, thu: 8, fri: 8, sat: 0, sun: 0 };
+    const src = (settings && settings.standardDailyHoursByDay && typeof settings.standardDailyHoursByDay === "object")
+      ? settings.standardDailyHoursByDay
+      : {};
+    const out = { ...def };
+    Object.keys(def).forEach(k => {
+      const v = Number(src[k]);
+      if (!Number.isNaN(v) && v >= 0) out[k] = v;
+    });
+    return out;
   }
 
-  function countSelectedWorkdaysPerWeek(workdays) {
-    const keys = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-    return keys.reduce((sum, k) => sum + (workdays[k] ? 1 : 0), 0);
-  }
-
-  function getStandardDailyHours(settings, workdays) {
-    const weekly = getWeeklyHoursFromSettings(settings);
-    const days = countSelectedWorkdaysPerWeek(workdays);
-    if (weekly !== null && days > 0) return weekly / days;
-    const daily = Number(settings && settings.standardDailyHours);
-    if (!Number.isNaN(daily) && daily > 0) return daily;
-    return 8;
+  function getStandardDailyHoursForDate(settings, dateObj) {
+    const map = getDailyHoursByDay(settings);
+    const key = weekdayKey(dateObj);
+    return map[key];
   }
 
   function getVacationDayHours(settings) {
@@ -201,9 +220,7 @@
   function computeUsedVacationDaysForYear(data, year) {
     const settings = data.settings || {};
     const workdays = getWorkdaysSafe(settings);
-    const standardDailyHours = getStandardDailyHours(settings, workdays);
     const vacationDayHours = getVacationDayHours(settings);
-    const dayFactor = standardDailyHours / vacationDayHours;
 
     const abs = Array.isArray(data.absences) ? data.absences : [];
     const stamps = Array.isArray(data.stamps) ? data.stamps : [];
@@ -223,6 +240,8 @@
       const req = requiredWorkFraction(settings, workdays, d);
       if (req <= 0) return;
 
+      const standardDailyHours = getStandardDailyHoursForDate(settings, d);
+      const dayFactor = standardDailyHours / vacationDayHours;
       used += req * dayFactor;
     });
 
@@ -354,8 +373,17 @@
     }
     if (!Array.isArray(data.settings.customHolidays)) data.settings.customHolidays = [];
 
-    const daily = Number(data.settings.standardDailyHours);
-    if (Number.isNaN(daily) || daily <= 0) data.settings.standardDailyHours = 8;
+    const defDaily = { mon: 8, tue: 8, wed: 8, thu: 8, fri: 8, sat: 0, sun: 0 };
+    const srcDaily = (data.settings.standardDailyHoursByDay && typeof data.settings.standardDailyHoursByDay === "object")
+      ? data.settings.standardDailyHoursByDay
+      : {};
+    const normalizedDaily = { ...defDaily };
+    Object.keys(defDaily).forEach(k => {
+      const v = Number(srcDaily[k]);
+      if (!Number.isNaN(v) && v >= 0) normalizedDaily[k] = v;
+    });
+    data.settings.standardDailyHoursByDay = normalizedDaily;
+    if (data.settings.standardDailyHours !== undefined) delete data.settings.standardDailyHours;
     const vacHours = Number(data.settings.vacationDayHours);
     if (Number.isNaN(vacHours) || vacHours <= 0) data.settings.vacationDayHours = 8;
 

@@ -55,10 +55,9 @@
       </div>
 
       <div style="margin-top:0.75rem;">
-        <label class="label" for="standardDailyHours">Standardarbeitszeit pro Tag (Stunden)</label>
-        <input id="standardDailyHours" type="number" step="0.01" min="0" placeholder="z. B. 8"
-               style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
-        <p class="muted small">Wird genutzt, wenn keine Wochenstunden gesetzt sind.</p>
+        <label class="label">Standardarbeitszeit pro Tag (Stunden)</label>
+        <div class="grid2" id="dailyHoursWrap"></div>
+        <p class="muted small">Pro Wochentag eintragen (z. B. Freitag 4.0).</p>
       </div>
 
       <div class="row" style="margin-top:0.75rem;">
@@ -376,6 +375,42 @@
         });
       }
 
+      function renderDailyHours(settings) {
+        const wrap = document.getElementById("dailyHoursWrap");
+        wrap.innerHTML = "";
+
+        const def = { mon: 8, tue: 8, wed: 8, thu: 8, fri: 8, sat: 0, sun: 0 };
+        const src = (settings.standardDailyHoursByDay && typeof settings.standardDailyHoursByDay === "object")
+          ? settings.standardDailyHoursByDay
+          : {};
+        const hours = { ...def, ...src };
+
+        DAYS.forEach(day => {
+          const box = document.createElement("div");
+
+          const label = document.createElement("label");
+          label.className = "label";
+          label.setAttribute("for", "dh_" + day.key);
+          label.textContent = day.label;
+
+          const input = document.createElement("input");
+          input.id = "dh_" + day.key;
+          input.type = "number";
+          input.step = "0.01";
+          input.min = "0";
+          input.placeholder = "z. B. 8";
+          input.value = (typeof hours[day.key] === "number") ? String(hours[day.key]) : "";
+          input.style.width = "100%";
+          input.style.padding = "0.5rem";
+          input.style.border = "1px solid #ddd";
+          input.style.borderRadius = "6px";
+
+          box.appendChild(label);
+          box.appendChild(input);
+          wrap.appendChild(box);
+        });
+      }
+
       function renderCustom(settings) {
         const tbody = document.getElementById("customTbody");
         const list = Array.isArray(settings.customHolidays) ? settings.customHolidays : [];
@@ -552,8 +587,7 @@
           (typeof s.weeklyHours === "number") ? s.weeklyHours : "";
         document.getElementById("weeklyPercent").value =
           (typeof s.weeklyPercent === "number") ? s.weeklyPercent : "";
-        document.getElementById("standardDailyHours").value =
-          (typeof s.standardDailyHours === "number") ? s.standardDailyHours : 8;
+        renderDailyHours(s);
 
         document.getElementById("stateSelect").value = s.state || "";
         document.getElementById("ignoreHolidays").checked = !!s.ignoreHolidays;
@@ -595,8 +629,6 @@
       document.getElementById("btnSaveHours").addEventListener("click", () => {
         const hoursRaw = document.getElementById("weeklyHours").value;
         const percRaw = document.getElementById("weeklyPercent").value;
-        const dailyRaw = document.getElementById("standardDailyHours").value;
-
         const patch = {};
 
         if (hoursRaw !== "" && !Number.isNaN(Number(hoursRaw))) {
@@ -610,13 +642,17 @@
           patch.weeklyHours = (p / 100) * 40;
         }
 
-        if (dailyRaw === "") {
-          patch.standardDailyHours = null;
-        } else {
-          const daily = Number(dailyRaw);
-          if (Number.isNaN(daily) || daily <= 0) { setHint("hoursSavedHint", "Ungültige Standardarbeitszeit"); return; }
-          patch.standardDailyHours = daily;
+        const dailyByDay = {};
+        for (const day of DAYS) {
+          const input = document.getElementById("dh_" + day.key);
+          const raw = input ? input.value : "";
+          if (raw === "") { setHint("hoursSavedHint", "Ungültige Standardarbeitszeit"); return; }
+          const daily = Number(raw);
+          if (Number.isNaN(daily) || daily < 0) { setHint("hoursSavedHint", "Ungültige Standardarbeitszeit"); return; }
+          dailyByDay[day.key] = daily;
         }
+
+        patch.standardDailyHoursByDay = dailyByDay;
 
         saveSettings(patch);
         setHint("hoursSavedHint", "Gespeichert");
