@@ -133,7 +133,13 @@
 
       <div class="grid2">
         <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
-          <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Diese Woche</h3>
+          <div class="row" style="align-items:center;">
+            <h3 style="margin:0; font-size:1rem;">Woche</h3>
+            <div class="row-right">
+              <button class="btn secondary" id="weekPrev" type="button">◀</button>
+              <button class="btn secondary" id="weekNext" type="button">▶</button>
+            </div>
+          </div>
           <div class="muted small" id="weekRange">–</div>
 
           <div style="margin-top:0.5rem;">
@@ -157,7 +163,13 @@
         </div>
 
         <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
-          <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Dieser Monat</h3>
+          <div class="row" style="align-items:center;">
+            <h3 style="margin:0; font-size:1rem;">Monat</h3>
+            <div class="row-right">
+              <button class="btn secondary" id="monthPrev" type="button">◀</button>
+              <button class="btn secondary" id="monthNext" type="button">▶</button>
+            </div>
+          </div>
           <div class="muted small" id="monthRange">–</div>
 
           <div style="margin-top:0.5rem;">
@@ -719,8 +731,26 @@
       };
 
       // ---------- Rendering ----------
+      let weekOffset = 0;
+      let monthOffset = 0;
+
+      function getWeekReferenceDate() {
+        const d = new Date();
+        d.setDate(d.getDate() + (weekOffset * 7));
+        return d;
+      }
+
+      function getMonthReferenceDate() {
+        const d = new Date();
+        d.setMonth(d.getMonth() + monthOffset);
+        return d;
+      }
+
       function renderAnalysis() {
-        const summary = Analytics.getSummary();
+        const summary = Analytics.getSummary({
+          weekDate: getWeekReferenceDate(),
+          monthDate: getMonthReferenceDate()
+        });
 
         document.getElementById("weekRange").textContent =
           `${Analytics.formatDateYYYYMMDD(summary.week.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.week.endExclusive.getTime() - 1))}`;
@@ -1131,6 +1161,10 @@
 
       document.getElementById("btnRefresh").onclick = () => { renderAll(); setHint("Aktualisiert"); };
       document.getElementById("btnRecalc").onclick = () => { renderAnalysis(); renderCalendar(); };
+      document.getElementById("weekPrev").onclick = () => { weekOffset -= 1; renderAnalysis(); };
+      document.getElementById("weekNext").onclick = () => { weekOffset += 1; renderAnalysis(); };
+      document.getElementById("monthPrev").onclick = () => { monthOffset -= 1; renderAnalysis(); };
+      document.getElementById("monthNext").onclick = () => { monthOffset += 1; renderAnalysis(); };
       document.getElementById("btnAbsRefresh").onclick = () => {
         AbsenceService.ensureAutoVacationUpToYesterday();
         renderAbsences(); renderCalendar(); renderAnalysis(); renderDaysStamps();

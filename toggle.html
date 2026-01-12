@@ -36,7 +36,13 @@
 
       <div class="grid2">
         <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
-          <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Diese Woche</h3>
+          <div class="row" style="align-items:center;">
+            <h3 style="margin:0; font-size:1rem;">Woche</h3>
+            <div class="row-right">
+              <button class="btn secondary" id="weekPrev" type="button">◀</button>
+              <button class="btn secondary" id="weekNext" type="button">▶</button>
+            </div>
+          </div>
           <div class="muted small" id="weekRange">–</div>
 
           <div style="margin-top:0.5rem;">
@@ -60,7 +66,13 @@
         </div>
 
         <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
-          <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Dieser Monat</h3>
+          <div class="row" style="align-items:center;">
+            <h3 style="margin:0; font-size:1rem;">Monat</h3>
+            <div class="row-right">
+              <button class="btn secondary" id="monthPrev" type="button">◀</button>
+              <button class="btn secondary" id="monthNext" type="button">▶</button>
+            </div>
+          </div>
           <div class="muted small" id="monthRange">–</div>
 
           <div style="margin-top:0.5rem;">
@@ -124,13 +136,67 @@
 
   <script>
     (function () {
+      let weekOffset = 0;
+      let monthOffset = 0;
+
+      function getWeekReferenceDate() {
+        const d = new Date();
+        d.setDate(d.getDate() + (weekOffset * 7));
+        return d;
+      }
+
+      function getMonthReferenceDate() {
+        const d = new Date();
+        d.setMonth(d.getMonth() + monthOffset);
+        return d;
+      }
+
+      function renderAnalysis() {
+        const summary = Analytics.getSummary({
+          weekDate: getWeekReferenceDate(),
+          monthDate: getMonthReferenceDate()
+        });
+
+        document.getElementById("weekRange").textContent =
+          `${Analytics.formatDateYYYYMMDD(summary.week.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.week.endExclusive.getTime() - 1))}`;
+
+        document.getElementById("weekWorked").textContent = Analytics.formatHours(summary.week.workedHours);
+        document.getElementById("weekManualAdded").textContent =
+          `Manuell gezählt: ${Analytics.formatHours(summary.week.manualHoursAdded)} h`;
+        document.getElementById("weekStampIgnored").textContent =
+          `Stempel ignoriert (wegen manuell): ${Analytics.formatHours(summary.week.stampHoursIgnored)} h`;
+
+        document.getElementById("weekTarget").textContent = Analytics.formatHours(summary.week.targetHours);
+        document.getElementById("weekDiff").textContent = Analytics.formatSignedDiff(summary.week.diffHours);
+        document.getElementById("weekFlags").textContent =
+          `Stempel-Hinweise: Manuell: ${summary.week.manualCount} • Offene IN: ${summary.week.openCount} • OUT ohne IN: ${summary.week.unmatchedOutCount}`;
+
+        document.getElementById("monthRange").textContent =
+          `${Analytics.formatDateYYYYMMDD(summary.month.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.month.endExclusive.getTime() - 1))}`;
+
+        document.getElementById("monthWorked").textContent = Analytics.formatHours(summary.month.workedHours);
+        document.getElementById("monthManualAdded").textContent =
+          `Manuell gezählt: ${Analytics.formatHours(summary.month.manualHoursAdded)} h`;
+        document.getElementById("monthStampIgnored").textContent =
+          `Stempel ignoriert (wegen manuell): ${Analytics.formatHours(summary.month.stampHoursIgnored)} h`;
+
+        document.getElementById("monthTarget").textContent = Analytics.formatHours(summary.month.targetHours);
+        document.getElementById("monthDiff").textContent = Analytics.formatSignedDiff(summary.month.diffHours);
+        document.getElementById("monthFlags").textContent =
+          `Stempel-Hinweise: Manuell: ${summary.month.manualCount} • Offene IN: ${summary.month.openCount} • OUT ohne IN: ${summary.month.unmatchedOutCount}`;
+      }
+
       function renderAll() {
         if (window.AbsenceService) AbsenceService.ensureAutoVacationUpToYesterday();
-        if (window.Analytics) Analytics.getSummary();
+        if (window.Analytics) renderAnalysis();
         if (window.CalendarView) CalendarView.renderMonth("calendarMount", new Date());
       }
 
       document.getElementById("btnRecalc").onclick = renderAll;
+      document.getElementById("weekPrev").onclick = () => { weekOffset -= 1; renderAnalysis(); };
+      document.getElementById("weekNext").onclick = () => { weekOffset += 1; renderAnalysis(); };
+      document.getElementById("monthPrev").onclick = () => { monthOffset -= 1; renderAnalysis(); };
+      document.getElementById("monthNext").onclick = () => { monthOffset += 1; renderAnalysis(); };
       document.getElementById("btnAbsRefresh").onclick = renderAll;
 
       renderAll();
