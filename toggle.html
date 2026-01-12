@@ -40,6 +40,7 @@
             <h3 style="margin:0; font-size:1rem;">Woche</h3>
             <div class="row-right">
               <button class="btn secondary" id="weekPrev" type="button">◀</button>
+              <button class="btn secondary" id="weekToday" type="button">Heute</button>
               <button class="btn secondary" id="weekNext" type="button">▶</button>
             </div>
           </div>
@@ -70,6 +71,7 @@
             <h3 style="margin:0; font-size:1rem;">Monat</h3>
             <div class="row-right">
               <button class="btn secondary" id="monthPrev" type="button">◀</button>
+              <button class="btn secondary" id="monthToday" type="button">Heute</button>
               <button class="btn secondary" id="monthNext" type="button">▶</button>
             </div>
           </div>
@@ -195,8 +197,10 @@
       document.getElementById("btnRecalc").onclick = renderAll;
       document.getElementById("weekPrev").onclick = () => { weekOffset -= 1; renderAnalysis(); };
       document.getElementById("weekNext").onclick = () => { weekOffset += 1; renderAnalysis(); };
+      document.getElementById("weekToday").onclick = () => { weekOffset = 0; renderAnalysis(); };
       document.getElementById("monthPrev").onclick = () => { monthOffset -= 1; renderAnalysis(); };
       document.getElementById("monthNext").onclick = () => { monthOffset += 1; renderAnalysis(); };
+      document.getElementById("monthToday").onclick = () => { monthOffset = 0; renderAnalysis(); };
       document.getElementById("btnAbsRefresh").onclick = renderAll;
 
       renderAll();
