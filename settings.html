@@ -47,11 +47,18 @@
         </div>
 
         <div>
-          <label class="label" for="weeklyPercent">Wochenstunden in % (40h = 100%)</label>
-          <input id="weeklyPercent" type="number" step="0.01" min="0" placeholder="z. B. 80"
+          <label class="label" for="weeklyHoursFull">Wochenstunden für 100%</label>
+          <input id="weeklyHoursFull" type="number" step="0.01" min="0" placeholder="z. B. 40"
                  style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
-          <p class="muted small">Wenn du % eingibst, wird intern in Stunden umgerechnet (40h = 100%).</p>
+          <p class="muted small">Basiswert für die Prozent-Berechnung.</p>
         </div>
+      </div>
+
+      <div style="margin-top:0.75rem;">
+        <label class="label" for="weeklyPercent">Wochenstunden in %</label>
+        <input id="weeklyPercent" type="number" step="0.01" min="0" placeholder="z. B. 80"
+               style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+        <p class="muted small">Wenn du % eingibst, wird intern in Stunden umgerechnet (Basis: eingetragene 100%-Wochenstunden).</p>
       </div>
 
       <div class="row" style="margin-top:0.75rem;">
@@ -61,8 +68,8 @@
     </section>
 
     <section class="card">
-      <h2>Arbeitstage (für Sollstunden)</h2>
-      <p class="muted small">Standard: Montag bis Freitag</p>
+      <h2>Regelarbeitszeit pro Wochentag</h2>
+      <p class="muted small">Trage ein, an welchen Tagen wie viele Stunden du normalerweise arbeitest.</p>
 
       <div class="actions" id="workdaysWrap"></div>
 
@@ -133,8 +140,8 @@
 
       <div class="grid2">
         <div>
-          <label class="label" for="customDate">Datum (YYYY-MM-DD)</label>
-          <input id="customDate" type="text" placeholder="2026-12-24"
+          <label class="label" for="customDate">Datum</label>
+          <input id="customDate" type="date"
                  style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
         </div>
         <div>
@@ -181,6 +188,15 @@
           <p class="muted small" style="margin-top:0.3rem;">
             Nicht gestempelte Soll-Tage werden automatisch als Urlaub markiert und können nachträglich auf Krankheit oder Arbeit geändert werden.
           </p>
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-top:0.75rem;">
+        <div>
+          <label class="label" for="vacationDayHours">Stunden pro Urlaubstag</label>
+          <input id="vacationDayHours" type="number" step="0.25" min="0" placeholder="z. B. 8"
+                 style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+          <p class="muted small">Wird für die Bewertung von Urlaub in Stunden genutzt.</p>
         </div>
       </div>
 
@@ -231,6 +247,17 @@
         </div>
       </div>
 
+      <div class="row" style="margin-top:0.5rem; gap:1rem; flex-wrap:wrap;">
+        <label style="display:flex; gap:0.5rem; align-items:center;">
+          <input id="pvStartHalf" type="checkbox" />
+          <span>Start als halber Tag</span>
+        </label>
+        <label style="display:flex; gap:0.5rem; align-items:center;">
+          <input id="pvEndHalf" type="checkbox" />
+          <span>Ende als halber Tag</span>
+        </label>
+      </div>
+
       <div class="row" style="margin-top:0.75rem;">
         <button class="btn" id="btnAddPlanned" type="button">Eintragen</button>
         <button class="btn secondary" id="btnClearPlanned" type="button">Alle geplanten Urlaube löschen</button>
@@ -241,13 +268,15 @@
         <table class="table">
           <thead>
             <tr>
-              <th>Datum</th>
-              <th>Typ</th>
+              <th>Von</th>
+              <th>Bis</th>
+              <th>Details</th>
+              <th>Verbrauch</th>
               <th>Aktion</th>
             </tr>
           </thead>
           <tbody id="plannedTbody">
-            <tr><td colspan="3" class="muted">Noch kein geplanter Urlaub</td></tr>
+            <tr><td colspan="5" class="muted">Noch kein geplanter Urlaub</td></tr>
           </tbody>
         </table>
       </div>
@@ -256,14 +285,26 @@
     <section class="card">
       <h2>Wartung</h2>
       <div class="row">
-        <button class="btn secondary" id="btnResetAll" type="button">Alle lokalen Daten löschen</button>
+        <button class="btn secondary" id="btnResetAll" type="button">Alle Daten aus der App löschen</button>
         <span class="muted small">Vorsicht: löscht Stempel + Einstellungen</span>
       </div>
+    </section>
+
+    <section class="card">
+      <h2>Export</h2>
+      <div class="row">
+        <button class="btn" id="btnExportCsv" type="button">Export (Excel/CSV)</button>
+        <button class="btn secondary" id="btnExportJson" type="button">Backup (JSON)</button>
+        <span class="muted small" id="exportHint">–</span>
+      </div>
+      <p class="muted small">Export enthält alle Stempel- und manuellen Zeiterfassungen.</p>
     </section>
 
   </main>
 
   <script src="src/js/storage.js"></script>
+  <script src="src/js/holidays.js"></script>
+  <script src="src/js/export.js"></script>
 
   <script src="src/js/install.js"></script>
   <script>
@@ -285,6 +326,20 @@
 
       function getSettings() { return StorageService.getSettings() || {}; }
       function saveSettings(patch) { StorageService.updateSettings(patch); }
+      function getDailyHoursSafe(settings) {
+        const dh = (settings && settings.dailyHours && typeof settings.dailyHours === "object") ? settings.dailyHours : {};
+        return { ...dh };
+      }
+      function getWeeklyHoursBase(settings) {
+        return (settings && typeof settings.weeklyHoursFull === "number") ? settings.weeklyHoursFull : 40;
+      }
+      function getWeeklyHoursFromSettings(settings) {
+        if (settings && typeof settings.weeklyHours === "number") return settings.weeklyHours;
+        if (settings && typeof settings.weeklyPercent === "number") {
+          return (settings.weeklyPercent / 100) * getWeeklyHoursBase(settings);
+        }
+        return null;
+      }
 
       function parseDateYYYYMMDD(s) {
         if (typeof s !== "string") return null;
@@ -327,13 +382,17 @@
 
         const defaultDays = { mon:true, tue:true, wed:true, thu:true, fri:true, sat:false, sun:false };
         const workdays = settings.workdays || defaultDays;
+        const dailyHours = getDailyHoursSafe(settings);
+        const weeklyHours = getWeeklyHoursFromSettings(settings);
+        const selectedDays = Object.values(workdays).filter(Boolean).length;
+        const fallbackHours = (weeklyHours && selectedDays > 0) ? (weeklyHours / selectedDays) : 0;
 
         DAYS.forEach(day => {
-          const label = document.createElement("label");
-          label.className = "btn secondary";
-          label.style.display = "flex";
-          label.style.alignItems = "center";
-          label.style.gap = "0.4rem";
+          const line = document.createElement("div");
+          line.style.display = "flex";
+          line.style.alignItems = "center";
+          line.style.gap = "0.6rem";
+          line.style.flexWrap = "wrap";
 
           const cb = document.createElement("input");
           cb.type = "checkbox";
@@ -343,9 +402,51 @@
           const span = document.createElement("span");
           span.textContent = day.label;
 
+          const hoursInput = document.createElement("input");
+          hoursInput.type = "number";
+          hoursInput.step = "0.25";
+          hoursInput.min = "0";
+          hoursInput.id = "wh_" + day.key;
+          hoursInput.style.width = "110px";
+          hoursInput.style.padding = "0.3rem 0.4rem";
+          hoursInput.style.border = "1px solid #ddd";
+          hoursInput.style.borderRadius = "6px";
+
+          const currentHours = (typeof dailyHours[day.key] === "number")
+            ? dailyHours[day.key]
+            : (cb.checked ? fallbackHours : 0);
+          hoursInput.value = currentHours ? String(currentHours) : "0";
+          hoursInput.disabled = !cb.checked;
+
+          cb.addEventListener("change", () => {
+            if (!cb.checked) {
+              hoursInput.value = "0";
+              hoursInput.disabled = true;
+            } else {
+              hoursInput.disabled = false;
+              if (Number(hoursInput.value || 0) <= 0 && fallbackHours > 0) {
+                hoursInput.value = String(fallbackHours);
+              }
+            }
+          });
+
+          const unit = document.createElement("span");
+          unit.className = "muted small";
+          unit.textContent = "Std.";
+
+          const label = document.createElement("label");
+          label.className = "btn secondary";
+          label.style.display = "flex";
+          label.style.alignItems = "center";
+          label.style.gap = "0.4rem";
+
           label.appendChild(cb);
           label.appendChild(span);
-          wrap.appendChild(label);
+
+          line.appendChild(label);
+          line.appendChild(hoursInput);
+          line.appendChild(unit);
+          wrap.appendChild(line);
         });
       }
 
@@ -435,69 +536,208 @@
         hint.textContent = "Lokale Feiertage werden zusätzlich zum Bundesland berücksichtigt.";
       }
 
-      // Planned vacation storage: absences with planned=true
-      function getPlannedAbsences() {
-        const abs = StorageService.getAbsences();
-        return (Array.isArray(abs) ? abs : [])
-          .filter(a => a && a.planned === true && a.type === "VACATION" && a.date)
-          .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      function getWorkdaysSafe(settings) {
+        const def = { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false };
+        const wd = settings.workdays ? settings.workdays : def;
+        return { ...def, ...wd };
       }
 
-      function upsertPlannedVacationDay(dateStr) {
-        StorageService.upsertAbsence({
-          date: dateStr,
-          type: "VACATION",
-          auto: false,
-          planned: true,
-          updatedAt: Date.now()
-        });
+      function customOffFactor(settings, dateStr) {
+        const list = Array.isArray(settings.customHolidays) ? settings.customHolidays : [];
+        const found = list.find(x => x && x.date === dateStr);
+        if (!found) return 0;
+        const f = Number(found.factor);
+        if (Number.isNaN(f) || f < 0) return 0;
+        return Math.min(1, f);
       }
 
-      function removePlannedVacationDay(dateStr) {
-        const abs = StorageService.getAbsences();
-        const existing = (Array.isArray(abs) ? abs : []).find(a => a && a.date === dateStr);
-        if (existing && existing.planned === true) StorageService.removeAbsence(dateStr);
+      function legalOffFactor(settings, dateObj) {
+        if (!window.HolidaysService || !HolidaysService.getHolidayInfo) return 0;
+        const info = HolidaysService.getHolidayInfo(settings, dateObj);
+        return info && info.offFactor ? info.offFactor : 0;
       }
 
-      function addPlannedRange(fromStr, toStr) {
-        const res = eachDayInclusive(fromStr, toStr);
-        if (!res.ok) return res;
-
-        let count = 0;
-        res.days.forEach(ds => {
-          upsertPlannedVacationDay(ds);
-          count += 1;
-        });
-
-        return { ok: true, count };
+      function weekdayKey(d) {
+        const dow = d.getDay(); // 0..6
+        return dow === 1 ? "mon"
+          : dow === 2 ? "tue"
+          : dow === 3 ? "wed"
+          : dow === 4 ? "thu"
+          : dow === 5 ? "fri"
+          : dow === 6 ? "sat"
+          : "sun";
       }
 
-      function clearAllPlanned() {
+      function requiredWorkFraction(settings, workdays, dateObj) {
+        const key = weekdayKey(dateObj);
+        const dailyHours = getDailyHoursSafe(settings);
+        const hasDailyHours = Object.values(dailyHours).some(v => typeof v === "number");
+        if (hasDailyHours) {
+          const hours = dailyHours[key];
+          if (typeof hours !== "number" || hours <= 0) return 0;
+        } else if (!workdays[key]) {
+          return 0;
+        }
+
+        const dateStr = ymdFromDate(dateObj);
+        const off = Math.max(
+          legalOffFactor(settings, dateObj),
+          customOffFactor(settings, dateStr)
+        );
+        const req = 1 - off;
+        return req > 0 ? req : 0;
+      }
+
+      function getPlannedBlocks(settings) {
+        return Array.isArray(settings.plannedVacations) ? settings.plannedVacations : [];
+      }
+
+      function getBlockFraction(block, isStart, isEnd) {
+        if (block.from === block.to) {
+          if (block.startHalf || block.endHalf) return 0.5;
+          return 1;
+        }
+        if (isStart && block.startHalf) return 0.5;
+        if (isEnd && block.endHalf) return 0.5;
+        return 1;
+      }
+
+      function syncPlannedAbsences(blocks) {
         const abs = StorageService.getAbsences();
         (Array.isArray(abs) ? abs : []).forEach(a => {
           if (a && a.planned === true && a.date) StorageService.removeAbsence(a.date);
         });
+
+        blocks.forEach(block => {
+          const res = eachDayInclusive(block.from, block.to);
+          if (!res.ok) return;
+          res.days.forEach((ds, idx) => {
+            const isStart = idx === 0;
+            const isEnd = idx === res.days.length - 1;
+            const fraction = getBlockFraction(block, isStart, isEnd);
+            StorageService.upsertAbsence({
+              date: ds,
+              type: "VACATION",
+              auto: false,
+              planned: true,
+              fraction,
+              updatedAt: Date.now()
+            });
+          });
+        });
+      }
+
+      function computeBlockDays(block, settings) {
+        const res = eachDayInclusive(block.from, block.to);
+        if (!res.ok) return 0;
+
+        const workdays = getWorkdaysSafe(settings);
+        let sum = 0;
+        res.days.forEach((ds, idx) => {
+          const parts = parseDateYYYYMMDD(ds);
+          if (!parts) return;
+          const d = new Date(parts.y, parts.mo - 1, parts.d, 0, 0, 0, 0);
+          const req = requiredWorkFraction(settings, workdays, d);
+          if (req <= 0) return;
+          const fraction = getBlockFraction(block, idx === 0, idx === res.days.length - 1);
+          sum += req * fraction;
+        });
+        return sum;
+      }
+
+      function formatDays(n) {
+        if (typeof n !== "number" || Number.isNaN(n)) return "–";
+        const rounded = Math.round(n * 10) / 10;
+        if (Math.abs(rounded - Math.round(rounded)) < 1e-9) return String(Math.round(rounded));
+        return rounded.toFixed(1);
+      }
+
+      function getTotalEntitlement(settings) {
+        const totalYear = Number(settings.vacationAvailable || 0);
+        const carry = (typeof settings.carryoverRemaining === "number")
+          ? settings.carryoverRemaining
+          : (typeof settings.carryoverDays === "number" ? settings.carryoverDays : 0);
+        return Math.max(0, totalYear + Math.max(0, carry));
+      }
+
+      function computePlannedTotal(list, settings) {
+        return list.reduce((sum, block) => sum + computeBlockDays(block, settings), 0);
+      }
+
+      function buildBlocksFromAbsences() {
+        const abs = StorageService.getAbsences();
+        const planned = (Array.isArray(abs) ? abs : [])
+          .filter(a => a && a.planned === true && a.type === "VACATION" && a.date)
+          .map(a => a.date)
+          .sort();
+
+        if (!planned.length) return [];
+
+        const blocks = [];
+        let start = planned[0];
+        let prev = planned[0];
+
+        for (let i = 1; i <= planned.length; i++) {
+          const current = planned[i] || null;
+          const prevParts = parseDateYYYYMMDD(prev);
+          const curParts = current ? parseDateYYYYMMDD(current) : null;
+          const prevDate = prevParts ? new Date(prevParts.y, prevParts.mo - 1, prevParts.d, 0, 0, 0, 0) : null;
+          const curDate = curParts ? new Date(curParts.y, curParts.mo - 1, curParts.d, 0, 0, 0, 0) : null;
+
+          const isConsecutive = prevDate && curDate && (curDate.getTime() - prevDate.getTime() === 86400000);
+
+          if (!isConsecutive) {
+            blocks.push({
+              id: `pv_import_${blocks.length}_${Date.now()}`,
+              from: start,
+              to: prev,
+              startHalf: false,
+              endHalf: false,
+              createdAt: Date.now()
+            });
+            start = current;
+          }
+
+          prev = current;
+        }
+
+        return blocks.filter(Boolean);
       }
 
       function renderPlanned() {
         const tbody = document.getElementById("plannedTbody");
         tbody.innerHTML = "";
 
-        const list = getPlannedAbsences();
+        const settings = getSettings();
+        const list = getPlannedBlocks(settings)
+          .slice()
+          .sort((a, b) => String(a.from).localeCompare(String(b.from)));
+
         if (!list.length) {
-          tbody.innerHTML = `<tr><td colspan="3" class="muted">Noch kein geplanter Urlaub</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="5" class="muted">Noch kein geplanter Urlaub</td></tr>`;
           return;
         }
 
-        list.forEach(a => {
+        list.forEach(block => {
           const tr = document.createElement("tr");
 
-          const tdDate = document.createElement("td");
-          tdDate.className = "mono";
-          tdDate.textContent = a.date;
+          const tdFrom = document.createElement("td");
+          tdFrom.className = "mono";
+          tdFrom.textContent = block.from;
 
-          const tdType = document.createElement("td");
-          tdType.textContent = "Urlaub (geplant)";
+          const tdTo = document.createElement("td");
+          tdTo.className = "mono";
+          tdTo.textContent = block.to;
+
+          const tdDetails = document.createElement("td");
+          const details = [];
+          if (block.startHalf) details.push("Start: 1/2");
+          if (block.endHalf) details.push("Ende: 1/2");
+          tdDetails.textContent = details.length ? details.join(" • ") : "ganze Tage";
+
+          const tdUsed = document.createElement("td");
+          const usedDays = computeBlockDays(block, settings);
+          tdUsed.textContent = `${formatDays(usedDays)} Tage`;
 
           const tdAct = document.createElement("td");
           const btn = document.createElement("button");
@@ -505,24 +745,42 @@
           btn.type = "button";
           btn.textContent = "Entfernen";
           btn.onclick = () => {
-            removePlannedVacationDay(a.date);
+            const next = getPlannedBlocks(getSettings()).filter(x => {
+              if (!x) return false;
+              if (block.id) return x.id !== block.id;
+              return !(x.from === block.from && x.to === block.to && !!x.startHalf === !!block.startHalf && !!x.endHalf === !!block.endHalf);
+            });
+            saveSettings({ plannedVacations: next });
+            syncPlannedAbsences(next);
             renderPlanned();
             setHint("plannedHint", "Entfernt");
           };
           tdAct.appendChild(btn);
 
-          tr.appendChild(tdDate);
-          tr.appendChild(tdType);
+          tr.appendChild(tdFrom);
+          tr.appendChild(tdTo);
+          tr.appendChild(tdDetails);
+          tr.appendChild(tdUsed);
           tr.appendChild(tdAct);
           tbody.appendChild(tr);
         });
       }
 
       function loadIntoForm() {
-        const s = getSettings();
+        let s = getSettings();
+
+        if ((!Array.isArray(s.plannedVacations) || !s.plannedVacations.length)) {
+          const imported = buildBlocksFromAbsences();
+          if (imported.length) {
+            saveSettings({ plannedVacations: imported });
+            s = getSettings();
+          }
+        }
 
         document.getElementById("weeklyHours").value =
           (typeof s.weeklyHours === "number") ? s.weeklyHours : "";
+        document.getElementById("weeklyHoursFull").value =
+          (typeof s.weeklyHoursFull === "number") ? s.weeklyHoursFull : 40;
         document.getElementById("weeklyPercent").value =
           (typeof s.weeklyPercent === "number") ? s.weeklyPercent : "";
 
@@ -533,6 +791,8 @@
 
         document.getElementById("vacationAvailable").value =
           (typeof s.vacationAvailable === "number") ? s.vacationAvailable : "";
+        document.getElementById("vacationDayHours").value =
+          (typeof s.vacationDayHours === "number") ? s.vacationDayHours : 8;
 
         document.getElementById("carryoverYear").value =
           (typeof s.carryoverYear === "number") ? s.carryoverYear : "";
@@ -543,6 +803,7 @@
         renderWorkdays(s);
         renderCustom(s);
         renderPlanned();
+        syncPlannedAbsences(getPlannedBlocks(getSettings()));
       }
 
       // React to state changes
@@ -564,18 +825,24 @@
       document.getElementById("btnSaveHours").addEventListener("click", () => {
         const hoursRaw = document.getElementById("weeklyHours").value;
         const percRaw = document.getElementById("weeklyPercent").value;
+        const baseRaw = document.getElementById("weeklyHoursFull").value;
 
         const patch = {};
+
+        if (baseRaw !== "" && !Number.isNaN(Number(baseRaw))) {
+          patch.weeklyHoursFull = Number(baseRaw);
+        }
 
         if (hoursRaw !== "" && !Number.isNaN(Number(hoursRaw))) {
           patch.weeklyHours = Number(hoursRaw);
           patch.weeklyPercent = null;
-        }
-
-        if (percRaw !== "" && !Number.isNaN(Number(percRaw))) {
+        } else if (percRaw !== "" && !Number.isNaN(Number(percRaw))) {
           const p = Number(percRaw);
           patch.weeklyPercent = p;
-          patch.weeklyHours = (p / 100) * 40;
+          patch.weeklyHours = null;
+        } else {
+          if (hoursRaw === "") patch.weeklyHours = null;
+          if (percRaw === "") patch.weeklyPercent = null;
         }
 
         saveSettings(patch);
@@ -585,11 +852,16 @@
       // Save: Workdays
       document.getElementById("btnSaveWorkdays").addEventListener("click", () => {
         const wd = {};
+        const dh = {};
         DAYS.forEach(day => {
           const cb = document.getElementById("wd_" + day.key);
           wd[day.key] = !!(cb && cb.checked);
+          const hoursEl = document.getElementById("wh_" + day.key);
+          const hoursVal = hoursEl ? Number(hoursEl.value || 0) : 0;
+          dh[day.key] = (!Number.isNaN(hoursVal) && hoursVal >= 0) ? hoursVal : 0;
+          if (!wd[day.key]) dh[day.key] = 0;
         });
-        saveSettings({ workdays: wd });
+        saveSettings({ workdays: wd, dailyHours: dh });
         setHint("workdaysSavedHint", "Gespeichert");
       });
 
@@ -646,6 +918,7 @@
       // Save: Vacation + Carryover
       document.getElementById("btnSaveVacation").addEventListener("click", () => {
         const raw = document.getElementById("vacationAvailable").value;
+        const dayHoursRaw = document.getElementById("vacationDayHours").value;
         const cyRaw = document.getElementById("carryoverYear").value;
         const cdRaw = document.getElementById("carryoverDays").value;
 
@@ -656,6 +929,13 @@
           const n = Number(raw);
           if (Number.isNaN(n) || n < 0) { setHint("vacationSavedHint", "Ungültige Urlaubstage"); return; }
           patch.vacationAvailable = Math.floor(n);
+        }
+
+        if (dayHoursRaw === "") patch.vacationDayHours = 8;
+        else {
+          const h = Number(dayHoursRaw);
+          if (Number.isNaN(h) || h < 0) { setHint("vacationSavedHint", "Ungültige Stunden pro Urlaubstag"); return; }
+          patch.vacationDayHours = h;
         }
 
         if (cyRaw === "") {
@@ -685,20 +965,58 @@
       document.getElementById("btnAddPlanned").addEventListener("click", () => {
         const from = document.getElementById("pvFrom").value.trim();
         const to = document.getElementById("pvTo").value.trim();
-        const res = addPlannedRange(from, to || from);
+        const startHalf = document.getElementById("pvStartHalf").checked;
+        const endHalf = document.getElementById("pvEndHalf").checked;
+        const res = eachDayInclusive(from, to || from);
         if (!res.ok) { setHint("plannedHint", res.error); return; }
+
+        const block = {
+          id: `pv_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+          from,
+          to: to || from,
+          startHalf,
+          endHalf,
+          createdAt: Date.now()
+        };
+
+        const s = getSettings();
+        const next = getPlannedBlocks(s).concat(block);
+        saveSettings({ plannedVacations: next });
+        syncPlannedAbsences(next);
+
         document.getElementById("pvFrom").value = "";
         document.getElementById("pvTo").value = "";
+        document.getElementById("pvStartHalf").checked = false;
+        document.getElementById("pvEndHalf").checked = false;
         renderPlanned();
-        setHint("plannedHint", `Eingetragen: ${res.count} Tag(e)`);
+        const used = computeBlockDays(block, getSettings());
+        setHint("plannedHint", `Eingetragen: ${formatDays(used)} Urlaubstag(e)`);
+
+        const totalEntitlement = getTotalEntitlement(getSettings());
+        const plannedTotal = computePlannedTotal(next, getSettings());
+        if (plannedTotal > totalEntitlement) {
+          const diff = plannedTotal - totalEntitlement;
+          alert(`Warnung: ${formatDays(diff)} Urlaubstag(e) zu viel geplant.`);
+        }
       });
 
       document.getElementById("btnClearPlanned").addEventListener("click", () => {
         const ok = confirm("Wirklich ALLE geplanten Urlaube löschen?");
         if (!ok) return;
-        clearAllPlanned();
+        saveSettings({ plannedVacations: [] });
+        syncPlannedAbsences([]);
         renderPlanned();
         setHint("plannedHint", "Alle geplanten Urlaube gelöscht");
+      });
+
+      document.getElementById("btnExportCsv").addEventListener("click", () => {
+        ExportService.exportTimeTrackingCSV({ delimiter: ";" });
+        setHint("exportHint", "CSV exportiert");
+      });
+
+      document.getElementById("btnExportJson").addEventListener("click", () => {
+        ExportService.exportAllJSON();
+        setHint("exportHint", "JSON exportiert");
       });
 
       // Reset

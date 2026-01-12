@@ -53,6 +53,22 @@
     return { ...def, ...wd };
   }
 
+  function getDailyHoursSafe(settings) {
+    const dh = (settings && settings.dailyHours && typeof settings.dailyHours === "object") ? settings.dailyHours : {};
+    return { ...dh };
+  }
+
+  function isWorkdayForDate(settings, workdays, dateObj) {
+    const key = weekdayKey(dateObj);
+    const dailyHours = getDailyHoursSafe(settings);
+    const hasDailyHours = Object.values(dailyHours).some(v => typeof v === "number");
+    if (hasDailyHours) {
+      const hours = dailyHours[key];
+      return typeof hours === "number" && hours > 0;
+    }
+    return !!workdays[key];
+  }
+
   function customFactorForDate(settings, dateStr) {
     const list = Array.isArray(settings.customHolidays) ? settings.customHolidays : [];
     const found = list.find(x => x && x.date === dateStr);
@@ -68,6 +84,100 @@
     const m = new Map();
     abs.forEach(a => { if (a && a.date) m.set(a.date, a); });
     return m;
+  }
+
+  function minutesToHM(totalMinutes) {
+    const mins = Math.max(0, Math.round(totalMinutes || 0));
+    const hh = Math.floor(mins / 60);
+    const mm = mins % 60;
+    return `${hh}:${String(mm).padStart(2, "0")}`;
+  }
+
+  function buildSessions(stampsSorted) {
+    const sessions = [];
+    let openIn = null;
+
+    for (const st of stampsSorted) {
+      if (st.type === "IN") { openIn = st; continue; }
+      if (st.type === "OUT") {
+        if (openIn && typeof openIn.timestamp === "number" && st.timestamp >= openIn.timestamp) {
+          sessions.push({ startTs: openIn.timestamp, endTs: st.timestamp });
+          openIn = null;
+        } else {
+          sessions.push({ startTs: null, endTs: st.timestamp });
+        }
+      }
+    }
+
+    return sessions;
+  }
+
+  function splitSessionByDay(startTs, endTs) {
+    const map = new Map();
+    let cur = new Date(startTs);
+    const end = new Date(endTs);
+
+    while (cur.getTime() < end.getTime()) {
+      const dayStart = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate(), 0, 0, 0, 0).getTime();
+      const dayEnd = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1, 0, 0, 0, 0).getTime();
+
+      const segStart = Math.max(startTs, dayStart);
+      const segEnd = Math.min(endTs, dayEnd);
+
+      if (segEnd > segStart) {
+        const dateStr = ymd(new Date(dayStart));
+        map.set(dateStr, (map.get(dateStr) || 0) + (segEnd - segStart));
+      }
+
+      cur = new Date(dayEnd);
+    }
+
+    return map;
+  }
+
+  function computeWorkedMinutesByDate(stamps, manualList, periodStart, periodEndExclusive) {
+    const map = new Map();
+    const stampMinutes = new Map();
+
+    const sorted = (Array.isArray(stamps) ? stamps : [])
+      .filter(s => s && typeof s.timestamp === "number")
+      .slice()
+      .sort((a, b) => a.timestamp - b.timestamp);
+
+    const sessions = buildSessions(sorted);
+    sessions.forEach(sess => {
+      if (typeof sess.startTs === "number" && typeof sess.endTs === "number") {
+        const s = Math.max(sess.startTs, periodStart.getTime());
+        const e = Math.min(sess.endTs, periodEndExclusive.getTime());
+        if (e > s) {
+          const parts = splitSessionByDay(s, e);
+          parts.forEach((ms, dateStr) => {
+            stampMinutes.set(dateStr, (stampMinutes.get(dateStr) || 0) + ms);
+          });
+        }
+      }
+    });
+
+    const manualMap = new Map();
+    (Array.isArray(manualList) ? manualList : []).forEach(entry => {
+      if (!entry || !entry.date) return;
+      const d = new Date(entry.date + "T00:00:00");
+      if (Number.isNaN(d.getTime())) return;
+      if (d >= periodStart && d < periodEndExclusive) {
+        manualMap.set(entry.date, Number(entry.minutesWorked || 0));
+      }
+    });
+
+    const allDates = new Set([...stampMinutes.keys(), ...manualMap.keys()]);
+    allDates.forEach(dateStr => {
+      if (manualMap.has(dateStr)) {
+        map.set(dateStr, { minutes: manualMap.get(dateStr), source: "manual" });
+      } else if (stampMinutes.has(dateStr)) {
+        map.set(dateStr, { minutes: Math.round(stampMinutes.get(dateStr) / 60000), source: "stamp" });
+      }
+    });
+
+    return map;
   }
 
   // --- Problem-Map aus Stempeln bauen ---
@@ -123,6 +233,10 @@
     const workdays = getWorkdaysSafe(settings);
     const absMap = getAbsenceMap();
     const issueMap = getStampIssueMap();
+    const data = StorageService.getData();
+    const stamps = Array.isArray(data.stamps) ? data.stamps : [];
+    const manualList = StorageService.getManualWork();
+    const workedMap = computeWorkedMinutesByDate(stamps, manualList, start, endEx);
 
     const now = targetDate || new Date();
     const start = monthStart(now);
@@ -140,8 +254,7 @@
     const d = new Date(start.getTime());
     while (d < endEx) {
       const dateStr = ymd(d);
-      const key = weekdayKey(d);
-      const isWorkday = !!workdays[key];
+      const isWorkday = isWorkdayForDate(settings, workdays, d);
 
       const legal = (window.HolidaysService && HolidaysService.getHolidayInfo)
         ? HolidaysService.getHolidayInfo(settings, d)
@@ -149,10 +262,11 @@
 
       const customOff = customFactorForDate(settings, dateStr);
       const offFactor = Math.max(legal.offFactor || 0, customOff || 0);
-      const requiredFraction = 1 - offFactor;
+      const requiredFraction = isWorkday ? (1 - offFactor) : 0;
 
       const abs = absMap.get(dateStr) || null;
       const issues = issueMap.get(dateStr) || null;
+      const worked = workedMap.get(dateStr) || null;
 
       cells.push({
         empty: false,
@@ -162,9 +276,11 @@
         legalName: legal.name || "",
         isLegal: !!legal.isHoliday,
         customOff,
+        offFactor,
         requiredFraction,
         abs,
-        issues
+        issues,
+        worked
       });
 
       d.setDate(d.getDate() + 1);
@@ -231,21 +347,30 @@
       div.className = classes.join(" ");
       if (hasIssue) div.title = issueTitle;
 
+      const workedLine = cell.worked
+        ? `<div class="cal-hours">${minutesToHM(cell.worked.minutes)}</div>`
+        : "";
+
       div.innerHTML = `
         <div class="cal-daynum">${cell.day}</div>
 
         <div class="cal-meta">
           ${cell.isWorkday ? `<span class="badge">Soll</span>` : `<span class="badge ghost">frei</span>`}
-          ${cell.requiredFraction === 0 ? `<span class="badge warn">Feiertag</span>` : ""}
-          ${cell.requiredFraction < 1 && cell.requiredFraction > 0 ? `<span class="badge warn">teilfrei</span>` : ""}
+          ${cell.offFactor === 1 ? `<span class="badge warn">Feiertag</span>` : ""}
+          ${cell.offFactor > 0 && cell.offFactor < 1 ? `<span class="badge warn">teilfrei</span>` : ""}
           ${abs ? `<span class="badge info">${absBadge}</span>` : ""}
           ${hasIssue ? `<span class="badge danger">⚠</span>` : ""}
         </div>
 
+        ${workedLine}
         <div class="cal-label">${cell.isLegal ? cell.legalName : ""}</div>
         <div class="cal-label muted">${cell.customOff > 0 ? (cell.customOff === 1 ? "Custom frei" : `Custom Faktor ${cell.customOff}`) : ""}</div>
         <div class="cal-label danger-text">${hasIssue ? issueTitle : ""}</div>
       `;
+
+      div.addEventListener("click", () => {
+        document.dispatchEvent(new CustomEvent("calendar:dayclick", { detail: { date: cell.dateStr } }));
+      });
 
       calDays.appendChild(div);
     });

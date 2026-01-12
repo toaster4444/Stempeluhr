@@ -56,6 +56,11 @@
     return { ...def, ...wd };
   }
 
+  function getDailyHoursSafe(settings) {
+    const dh = (settings && settings.dailyHours && typeof settings.dailyHours === "object") ? settings.dailyHours : {};
+    return { ...dh };
+  }
+
   function customOffFactor(settings, dateStr) {
     const list = Array.isArray(settings.customHolidays) ? settings.customHolidays : [];
     const found = list.find(x => x && x.date === dateStr);
@@ -73,7 +78,14 @@
 
   function isSollWorkday(settings, workdays, dateObj) {
     const key = weekdayKey(dateObj);
-    if (!workdays[key]) return false;
+    const dailyHours = getDailyHoursSafe(settings);
+    const hasDailyHours = Object.values(dailyHours).some(v => typeof v === "number");
+    if (hasDailyHours) {
+      const hours = dailyHours[key];
+      if (typeof hours !== "number" || hours <= 0) return false;
+    } else if (!workdays[key]) {
+      return false;
+    }
 
     const dateStr = ymd(dateObj);
     const off = Math.max(

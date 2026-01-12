@@ -27,12 +27,20 @@
 
         // Arbeitstage
         workdays: { mon:true, tue:true, wed:true, thu:true, fri:true, sat:false, sun:false },
+        dailyHours: {},
 
         // Feiertage / custom
         state: "",
         ignoreHolidays: false,
         localProfile: "",
-        customHolidays: []
+        customHolidays: [],
+
+        // Wochenstunden-Logik
+        weeklyHoursFull: 40,
+
+        // Urlaub
+        vacationDayHours: 8,
+        plannedVacations: []
       },
       absences: [],
       manualWork: [],
@@ -66,8 +74,24 @@
       merged.settings.workdays = { ...base.settings.workdays, ...merged.settings.workdays };
     }
 
+    if (!merged.settings.dailyHours || typeof merged.settings.dailyHours !== "object") {
+      merged.settings.dailyHours = { ...base.settings.dailyHours };
+    }
+
     // customHolidays default absichern
     if (!Array.isArray(merged.settings.customHolidays)) merged.settings.customHolidays = [];
+
+    if (typeof merged.settings.weeklyHoursFull !== "number") {
+      merged.settings.weeklyHoursFull = base.settings.weeklyHoursFull;
+    }
+
+    if (typeof merged.settings.vacationDayHours !== "number") {
+      merged.settings.vacationDayHours = base.settings.vacationDayHours;
+    }
+
+    if (!Array.isArray(merged.settings.plannedVacations)) {
+      merged.settings.plannedVacations = [];
+    }
 
     return merged;
   }
@@ -122,6 +146,11 @@
     return { ...def, ...wd };
   }
 
+  function getDailyHoursSafe(settings) {
+    const dh = (settings && settings.dailyHours && typeof settings.dailyHours === "object") ? settings.dailyHours : {};
+    return { ...dh };
+  }
+
   function customOffFactor(settings, dateStr) {
     const list = Array.isArray(settings.customHolidays) ? settings.customHolidays : [];
     const found = list.find(x => x && x.date === dateStr);
@@ -141,7 +170,14 @@
   // required work fraction: 0 / 0.5 / 1 ...
   function requiredWorkFraction(settings, workdays, dateObj) {
     const key = weekdayKey(dateObj);
-    if (!workdays[key]) return 0;
+    const dailyHours = getDailyHoursSafe(settings);
+    const hasDailyHours = Object.values(dailyHours).some(v => typeof v === "number");
+    if (hasDailyHours) {
+      const hours = dailyHours[key];
+      if (typeof hours !== "number" || hours <= 0) return 0;
+    } else if (!workdays[key]) {
+      return 0;
+    }
 
     const dateStr = `${String(dateObj.getFullYear()).padStart(4, "0")}-${pad2(dateObj.getMonth() + 1)}-${pad2(dateObj.getDate())}`;
     const off = Math.max(
@@ -184,7 +220,11 @@
       const req = requiredWorkFraction(settings, workdays, d);
       if (req <= 0) return;
 
-      used += req;
+      const fraction = (typeof a.fraction === "number" && !Number.isNaN(a.fraction))
+        ? Math.max(0, Math.min(1, a.fraction))
+        : 1;
+
+      used += req * fraction;
     });
 
     return used;
@@ -313,7 +353,11 @@
     } else {
       data.settings.workdays = { mon:true, tue:true, wed:true, thu:true, fri:true, sat:false, sun:false, ...data.settings.workdays };
     }
+    if (!data.settings.dailyHours || typeof data.settings.dailyHours !== "object") data.settings.dailyHours = {};
     if (!Array.isArray(data.settings.customHolidays)) data.settings.customHolidays = [];
+    if (typeof data.settings.weeklyHoursFull !== "number") data.settings.weeklyHoursFull = 40;
+    if (typeof data.settings.vacationDayHours !== "number") data.settings.vacationDayHours = 8;
+    if (!Array.isArray(data.settings.plannedVacations)) data.settings.plannedVacations = [];
 
     save(data);
   }

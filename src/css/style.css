@@ -343,15 +343,23 @@ a {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  cursor: pointer;
 }
 
 .cal-empty {
   background: transparent;
   border: none;
+  cursor: default;
 }
 
 .cal-daynum {
   font-weight: 700;
+}
+
+.cal-hours {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #1f2933;
 }
 
 .cal-meta {

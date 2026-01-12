@@ -133,7 +133,13 @@
 
       <div class="grid2">
         <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
-          <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Diese Woche</h3>
+          <div class="row" style="margin-bottom:0.5rem;">
+            <h3 style="margin:0; font-size:1rem;">Diese Woche</h3>
+            <div class="row-right">
+              <button class="btn secondary mini" id="btnWeekPrev" type="button">◀</button>
+              <button class="btn secondary mini" id="btnWeekNext" type="button">▶</button>
+            </div>
+          </div>
           <div class="muted small" id="weekRange">–</div>
 
           <div style="margin-top:0.5rem;">
@@ -157,7 +163,13 @@
         </div>
 
         <div class="card" style="margin:0; box-shadow:none; border:1px solid #eee;">
-          <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Dieser Monat</h3>
+          <div class="row" style="margin-bottom:0.5rem;">
+            <h3 style="margin:0; font-size:1rem;">Dieser Monat</h3>
+            <div class="row-right">
+              <button class="btn secondary mini" id="btnMonthPrev" type="button">◀</button>
+              <button class="btn secondary mini" id="btnMonthNext" type="button">▶</button>
+            </div>
+          </div>
           <div class="muted small" id="monthRange">–</div>
 
           <div style="margin-top:0.5rem;">
@@ -251,66 +263,11 @@
 
     <section class="card">
       <div class="row">
-        <h2>Tage & Stempel (aktueller Monat)</h2>
-        <div class="row-right">
-          <button class="btn secondary" id="btnManualRefresh" type="button">Aktualisieren</button>
-        </div>
-      </div>
-
-      <p class="muted small">
-        Es werden nur Tage bis heute angezeigt. Konflikte stehen darunter in rot.
-        Pro Tag kannst du Stempel hinzufügen, bearbeiten oder löschen. „Zeit“ öffnet den Arbeitszeit-Nachtrag.
-      </p>
-
-      <div class="table-wrap">
-        <table class="table days-table">
-          <thead>
-            <tr>
-              <th style="width: 120px;">Datum</th>
-              <th>Stempel (IN/OUT)</th>
-              <th style="width: 260px;">Manuell</th>
-            </tr>
-          </thead>
-          <tbody id="daysTbody">
-            <tr><td colspan="3" class="muted">Lade…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Status</h2>
-      <div class="grid2">
-        <div>
-          <div class="label">Letzter Stempel</div>
-          <div class="value" id="lastStampValue">–</div>
-          <div class="muted" id="lastStampMeta">–</div>
-        </div>
-        <div>
-          <div class="label">Hinweise</div>
-          <div id="alerts" class="alerts">
-            <div class="muted">Keine</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="row">
         <h2>Rohdaten (letzte 30 angezeigt)</h2>
         <div class="row-right">
           <button class="btn secondary" id="btnRefresh" type="button">Aktualisieren</button>
         </div>
       </div>
-
-      <div class="actions" style="margin: 0.5rem 0 0.75rem;">
-        <button class="btn" id="btnExportCsv" type="button">Export (Excel/CSV)</button>
-        <button class="btn secondary" id="btnExportJson" type="button">Backup (JSON)</button>
-        <span class="muted small" id="exportHint">–</span>
-      </div>
-      <p class="muted small" style="margin-top:-0.5rem;">
-        Export enthält alle verfügbaren Rohdaten.
-      </p>
 
       <div class="table-wrap">
         <table class="table">
@@ -331,6 +288,47 @@
     </section>
 
   </main>
+
+  <!-- Modal: Tagesdetails -->
+  <div id="dayModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" id="dayModalBackdrop"></div>
+    <div class="modal-card">
+      <div class="row">
+        <h3 style="margin:0;">Tagesdetails</h3>
+        <button class="btn secondary" id="btnDayModalClose" type="button">✕</button>
+      </div>
+
+      <div class="muted small" id="dayModalDate">–</div>
+
+      <div style="margin-top:0.75rem;">
+        <div class="label">Stempelungen</div>
+        <div id="dayModalStamps" class="muted small">–</div>
+        <div class="row" style="margin-top:0.5rem;">
+          <button class="btn secondary" id="btnDayAddStamp" type="button">Stempel hinzufügen</button>
+        </div>
+      </div>
+
+      <div style="margin-top:1rem;">
+        <div class="label">Manuelle Arbeitszeit</div>
+        <div id="dayModalManualInfo" class="muted small">–</div>
+        <div class="row" style="margin-top:0.5rem;">
+          <button class="btn secondary" id="btnDayManualEdit" type="button">Arbeitszeit bearbeiten</button>
+          <button class="btn secondary" id="btnDayManualDelete" type="button">Arbeitszeit löschen</button>
+        </div>
+      </div>
+
+      <div style="margin-top:1rem;">
+        <div class="label">Abwesenheit</div>
+        <div id="dayModalAbsenceInfo" class="muted small">–</div>
+        <div class="row" id="dayAbsenceActions" style="margin-top:0.5rem; flex-wrap:wrap;">
+          <button class="btn secondary" data-action="VACATION" type="button">Urlaub</button>
+          <button class="btn secondary" data-action="SICK" type="button">Krank</button>
+          <button class="btn secondary" data-action="WORK_MANUAL" type="button">Arbeit (manuell)</button>
+          <button class="btn secondary" data-action="CLEAR" type="button">Kein Eintrag</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal: Arbeitszeit nachtragen -->
   <div id="manualModal" class="modal hidden" aria-hidden="true">
@@ -376,8 +374,6 @@
 
   <script src="src/js/storage.js"></script>
   <script src="src/js/clock.js"></script>
-
-  <script src="src/js/export.js"></script>
 
   <script src="src/js/holidays.js"></script>
   <script src="src/js/analytics.js"></script>
@@ -428,6 +424,11 @@
         return { ...def, ...wd };
       }
 
+      function getDailyHoursSafe(settings) {
+        const dh = (settings && settings.dailyHours && typeof settings.dailyHours === "object") ? settings.dailyHours : {};
+        return { ...dh };
+      }
+
       function customOffFactor(settings, dateStr) {
         const list = Array.isArray(settings.customHolidays) ? settings.customHolidays : [];
         const found = list.find(x => x && x.date === dateStr);
@@ -450,7 +451,14 @@
       // gibt requiredFraction zurück: 0 / 0.5 / 1 ...
       function requiredWorkFraction(settings, workdays, dateObj) {
         const key = weekdayKey(dateObj);
-        if (!workdays[key]) return 0;
+        const dailyHours = getDailyHoursSafe(settings);
+        const hasDailyHours = Object.values(dailyHours).some(v => typeof v === "number");
+        if (hasDailyHours) {
+          const hours = dailyHours[key];
+          if (typeof hours !== "number" || hours <= 0) return 0;
+        } else if (!workdays[key]) {
+          return 0;
+        }
 
         const dateStr = ymdFromDate(dateObj);
         const off = Math.max(
@@ -515,12 +523,16 @@
           const req = requiredWorkFraction(settings, workdays, d);
           if (req <= 0) return;
 
+          const fraction = (typeof a.fraction === "number" && !Number.isNaN(a.fraction))
+            ? Math.max(0, Math.min(1, a.fraction))
+            : 1;
+
           if (d.getTime() <= today.getTime()) {
             // bis heute: auto + manuell + geplant zählen -> verbraucht
-            usedSoFar += req;
+            usedSoFar += req * fraction;
           } else {
             // Zukunft: nur "geplant" soll abgezogen werden
-            if (a.planned === true) plannedFuture += req;
+            if (a.planned === true) plannedFuture += req * fraction;
           }
         });
 
@@ -670,8 +682,9 @@
         if (em <= sm) { mwPreview.textContent = "Ende muss nach Start liegen."; return; }
 
         const worked = Math.max(0, (em - sm) - Math.max(0, b));
-        const hours = (worked / 60).toFixed(2);
-        mwPreview.textContent = `Ergebnis: ${worked} Minuten (= ${hours} Stunden)`;
+        const hh = Math.floor(worked / 60);
+        const mm = worked % 60;
+        mwPreview.textContent = `Ergebnis: ${worked} Minuten (= ${hh}:${String(mm).padStart(2, "0")} Stunden)`;
       }
 
       mwStart.addEventListener("input", updatePreview);
@@ -699,17 +712,34 @@
       };
 
       // ---------- Rendering ----------
+      let weekOffset = 0;
+      let monthOffset = 0;
+
+      function addDays(base, days) {
+        const d = new Date(base.getTime());
+        d.setDate(d.getDate() + days);
+        return d;
+      }
+
+      function addMonths(base, months) {
+        return new Date(base.getFullYear(), base.getMonth() + months, 1, 0, 0, 0, 0);
+      }
+
       function renderAnalysis() {
-        const summary = Analytics.getSummary();
+        const now = new Date();
+        const summary = Analytics.getSummary({
+          weekDate: addDays(now, weekOffset * 7),
+          monthDate: addMonths(now, monthOffset)
+        });
 
         document.getElementById("weekRange").textContent =
           `${Analytics.formatDateYYYYMMDD(summary.week.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.week.endExclusive.getTime() - 1))}`;
 
         document.getElementById("weekWorked").textContent = Analytics.formatHours(summary.week.workedHours);
         document.getElementById("weekManualAdded").textContent =
-          `Manuell gezählt: ${Analytics.formatHours(summary.week.manualHoursAdded)} h`;
+          `Manuell gezählt: ${Analytics.formatHours(summary.week.manualHoursAdded)}`;
         document.getElementById("weekStampIgnored").textContent =
-          `Stempel ignoriert (wegen manuell): ${Analytics.formatHours(summary.week.stampHoursIgnored)} h`;
+          `Stempel ignoriert (wegen manuell): ${Analytics.formatHours(summary.week.stampHoursIgnored)}`;
 
         document.getElementById("weekTarget").textContent = Analytics.formatHours(summary.week.targetHours);
         document.getElementById("weekDiff").textContent = Analytics.formatSignedDiff(summary.week.diffHours);
@@ -721,9 +751,9 @@
 
         document.getElementById("monthWorked").textContent = Analytics.formatHours(summary.month.workedHours);
         document.getElementById("monthManualAdded").textContent =
-          `Manuell gezählt: ${Analytics.formatHours(summary.month.manualHoursAdded)} h`;
+          `Manuell gezählt: ${Analytics.formatHours(summary.month.manualHoursAdded)}`;
         document.getElementById("monthStampIgnored").textContent =
-          `Stempel ignoriert (wegen manuell): ${Analytics.formatHours(summary.month.stampHoursIgnored)} h`;
+          `Stempel ignoriert (wegen manuell): ${Analytics.formatHours(summary.month.stampHoursIgnored)}`;
 
         document.getElementById("monthTarget").textContent = Analytics.formatHours(summary.month.targetHours);
         document.getElementById("monthDiff").textContent = Analytics.formatSignedDiff(summary.month.diffHours);
@@ -784,34 +814,11 @@
               renderAbsences();
               renderCalendar();
               renderAnalysis();
-              renderDaysStamps();
             };
           });
 
           tbody.appendChild(tr);
         });
-      }
-
-      // ---------- Tage & Stempel ----------
-      function getConflictForStamps(stampsForDay) {
-        const stamps = (stampsForDay || []).slice().sort((a, b) => a.timestamp - b.timestamp);
-        const reasons = [];
-
-        if (stamps.some(s => s && (s.manualRequired || s.cutoffFlag))) reasons.push("Manuelle Prüfung nötig");
-
-        for (let i = 1; i < stamps.length; i++) {
-          if (stamps[i] && stamps[i - 1] && stamps[i].type === stamps[i - 1].type) {
-            reasons.push("Doppelter Typ (z.B. IN/IN)");
-            break;
-          }
-        }
-
-        const inCount = stamps.filter(s => s && s.type === "IN").length;
-        const outCount = stamps.filter(s => s && s.type === "OUT").length;
-        if (inCount !== outCount) reasons.push(inCount > outCount ? "Offenes IN ohne OUT" : "OUT ohne IN");
-
-        const uniq = Array.from(new Set(reasons));
-        return { hasConflict: uniq.length > 0, text: uniq.join(" • ") };
       }
 
       function promptHHMM(defaultValue) {
@@ -832,200 +839,218 @@
         return { ok: true, type: t };
       }
 
-      function renderDaysStamps() {
-        const tbody = document.getElementById("daysTbody");
-        tbody.innerHTML = "";
+      // ---------- Tages-Modal ----------
+      let currentDayModalDate = null;
+      const dayModal = document.getElementById("dayModal");
+      const dayModalBackdrop = document.getElementById("dayModalBackdrop");
+      const btnDayModalClose = document.getElementById("btnDayModalClose");
+      const dayModalDate = document.getElementById("dayModalDate");
+      const dayModalStamps = document.getElementById("dayModalStamps");
+      const dayModalManualInfo = document.getElementById("dayModalManualInfo");
+      const dayModalAbsenceInfo = document.getElementById("dayModalAbsenceInfo");
+      const btnDayAddStamp = document.getElementById("btnDayAddStamp");
+      const btnDayManualEdit = document.getElementById("btnDayManualEdit");
+      const btnDayManualDelete = document.getElementById("btnDayManualDelete");
+      const dayAbsenceActions = document.getElementById("dayAbsenceActions");
+
+      function parseDateParts(dateStr) {
+        const m = String(dateStr || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m) return null;
+        return { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) };
+      }
+
+      function openDayModal(dateStr) {
+        currentDayModalDate = dateStr;
+        renderDayModal();
+        dayModal.classList.remove("hidden");
+        dayModal.setAttribute("aria-hidden", "false");
+      }
+
+      function closeDayModal() {
+        dayModal.classList.add("hidden");
+        dayModal.setAttribute("aria-hidden", "true");
+        currentDayModalDate = null;
+      }
+
+      function renderDayModal() {
+        if (!currentDayModalDate) return;
+        const dateStr = currentDayModalDate;
+        dayModalDate.textContent = `Datum: ${dateStr}`;
+
+        const parts = parseDateParts(dateStr);
+        if (!parts) return;
 
         const data = StorageService.getData();
-        const stampsAll = Array.isArray(data.stamps) ? data.stamps : [];
+        const stamps = Array.isArray(data.stamps) ? data.stamps : [];
+        const dayStamps = stamps
+          .filter(s => s && s.year === parts.y && s.month === parts.m && s.day === parts.d)
+          .slice()
+          .sort((a, b) => a.timestamp - b.timestamp);
 
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth(); // 0..11
-        const monthNr = month + 1;
+        dayModalStamps.innerHTML = "";
+        if (!dayStamps.length) {
+          dayModalStamps.textContent = "Keine Stempelungen";
+        } else {
+          dayStamps.forEach(st => {
+            const line = document.createElement("div");
+            line.className = "stamp-line";
 
-        const maxDay = now.getDate();
+            const label = document.createElement("span");
+            label.className = (st.manualRequired || st.cutoffFlag) ? "warn mono" : "mono";
+            label.textContent = `${st.type} ${pad2(st.hour)}:${pad2(st.minute)}:${pad2(st.second)}`;
 
-        for (let d = 1; d <= maxDay; d++) {
-          const dateStr = `${year}-${pad2(monthNr)}-${pad2(d)}`;
+            const actions = document.createElement("span");
+            actions.className = "stamp-actions";
 
-          const stampsForDay = stampsAll
-            .filter(s => s && s.year === year && s.month === monthNr && s.day === d)
-            .slice()
-            .sort((a, b) => a.timestamp - b.timestamp);
+            const btnEdit = document.createElement("button");
+            btnEdit.className = "btn secondary mini";
+            btnEdit.type = "button";
+            btnEdit.textContent = "Bearbeiten";
+            btnEdit.onclick = () => {
+              const tRes = promptType(st.type);
+              if (!tRes) return;
+              if (!tRes.ok) { alert(tRes.error); return; }
 
-          const manual = ManualWorkService.getByDate(dateStr);
-          const conflict = getConflictForStamps(stampsForDay);
+              const timeRes = promptHHMM(`${pad2(st.hour)}:${pad2(st.minute)}`);
+              if (!timeRes) return;
+              if (!timeRes.ok) { alert(timeRes.error); return; }
 
-          const tr1 = document.createElement("tr");
+              const newDate = new Date(parts.y, parts.m - 1, parts.d, timeRes.hh, timeRes.mm, 0, 0);
+              StorageService.updateStampByTimestamp(st.timestamp, {
+                type: tRes.type,
+                hour: timeRes.hh,
+                minute: timeRes.mm,
+                second: 0,
+                timestamp: newDate.getTime(),
+                iso: newDate.toISOString(),
+                year: parts.y,
+                month: parts.m,
+                day: parts.d,
+                manualRequired: false,
+                cutoffFlag: false
+              });
 
-          const dateCell = document.createElement("td");
-          dateCell.className = "mono";
-          dateCell.textContent = dateStr;
+              renderAll();
+              renderDayModal();
+              setHint(`Stempel geändert: ${dateStr} ${tRes.type} ${timeRes.raw}`);
+            };
 
-          const stampCell = document.createElement("td");
-          if (!stampsForDay.length) {
-            stampCell.innerHTML = `<span class="muted">–</span>`;
-          } else {
-            const wrap = document.createElement("div");
-            wrap.className = "days-stamps-wrap";
+            const btnDel = document.createElement("button");
+            btnDel.className = "btn secondary mini";
+            btnDel.type = "button";
+            btnDel.textContent = "Löschen";
+            btnDel.onclick = () => {
+              const ok = confirm(`Diesen Stempel wirklich löschen?\n${st.type} ${pad2(st.hour)}:${pad2(st.minute)}:${pad2(st.second)} (${dateStr})`);
+              if (!ok) return;
+              StorageService.deleteStampByTimestamp(st.timestamp);
+              renderAll();
+              renderDayModal();
+              setHint(`Stempel gelöscht: ${dateStr}`);
+            };
 
-            stampsForDay.forEach(st => {
-              const line = document.createElement("div");
-              line.className = "stamp-line";
+            actions.appendChild(btnEdit);
+            actions.appendChild(btnDel);
 
-              const label = document.createElement("span");
-              label.className = (st.manualRequired || st.cutoffFlag) ? "warn mono" : "mono";
-              label.textContent = `${st.type} ${pad2(st.hour)}:${pad2(st.minute)}:${pad2(st.second)}`;
+            line.appendChild(label);
+            if (st.manualRequired || st.cutoffFlag) {
+              const flag = document.createElement("span");
+              flag.className = "warn small";
+              flag.textContent = "⚠ manuell";
+              line.appendChild(flag);
+            }
+            line.appendChild(actions);
+            dayModalStamps.appendChild(line);
+          });
+        }
 
-              const actions = document.createElement("span");
-              actions.className = "stamp-actions";
+        const manual = ManualWorkService.getByDate(dateStr);
+        if (!manual) {
+          dayModalManualInfo.textContent = "Keine manuelle Arbeitszeit";
+        } else {
+          dayModalManualInfo.textContent =
+            `${manual.start}–${manual.end} • Pause ${manual.breakMinutes} • ${manual.minutesWorked} min`;
+        }
 
-              const btnEdit = document.createElement("button");
-              btnEdit.className = "btn secondary mini";
-              btnEdit.type = "button";
-              btnEdit.textContent = "Bearbeiten";
-              btnEdit.onclick = () => {
-                const tRes = promptType(st.type);
-                if (!tRes) return;
-                if (!tRes.ok) { alert(tRes.error); return; }
-
-                const timeRes = promptHHMM(`${pad2(st.hour)}:${pad2(st.minute)}`);
-                if (!timeRes) return;
-                if (!timeRes.ok) { alert(timeRes.error); return; }
-
-                const newDate = new Date(year, month, d, timeRes.hh, timeRes.mm, 0, 0);
-                StorageService.updateStampByTimestamp(st.timestamp, {
-                  type: tRes.type,
-                  hour: timeRes.hh,
-                  minute: timeRes.mm,
-                  second: 0,
-                  timestamp: newDate.getTime(),
-                  iso: newDate.toISOString(),
-                  year,
-                  month: monthNr,
-                  day: d,
-                  manualRequired: false,
-                  cutoffFlag: false
-                });
-
-                renderAll();
-                setHint(`Stempel geändert: ${dateStr} ${tRes.type} ${timeRes.raw}`);
-              };
-
-              const btnDel = document.createElement("button");
-              btnDel.className = "btn secondary mini";
-              btnDel.type = "button";
-              btnDel.textContent = "Löschen";
-              btnDel.onclick = () => {
-                const ok = confirm(`Diesen Stempel wirklich löschen?\n${st.type} ${pad2(st.hour)}:${pad2(st.minute)}:${pad2(st.second)} (${dateStr})`);
-                if (!ok) return;
-                StorageService.deleteStampByTimestamp(st.timestamp);
-                renderAll();
-                setHint(`Stempel gelöscht: ${dateStr}`);
-              };
-
-              actions.appendChild(btnEdit);
-              actions.appendChild(btnDel);
-
-              line.appendChild(label);
-              if (st.manualRequired || st.cutoffFlag) {
-                const flag = document.createElement("span");
-                flag.className = "warn small";
-                flag.textContent = "⚠ manuell";
-                line.appendChild(flag);
-              }
-              line.appendChild(actions);
-              wrap.appendChild(line);
-            });
-
-            stampCell.appendChild(wrap);
-          }
-
-          const manualCell = document.createElement("td");
-          if (!manual) {
-            manualCell.innerHTML = `<span class="muted">–</span>`;
-          } else {
-            manualCell.innerHTML =
-              `<span class="mono">${manual.start}–${manual.end}</span>
-               <span class="muted small"> • Pause ${manual.breakMinutes} • ${manual.minutesWorked} min</span>`;
-          }
-
-          tr1.appendChild(dateCell);
-          tr1.appendChild(stampCell);
-          tr1.appendChild(manualCell);
-
-          const tr2 = document.createElement("tr");
-          tr2.className = "days-subrow";
-
-          const td2 = document.createElement("td");
-          td2.colSpan = 3;
-
-          const box = document.createElement("div");
-          box.className = "subrow-box";
-
-          const left = document.createElement("div");
-          left.className = "subrow-left";
-
-          const conflictLine = document.createElement("div");
-          conflictLine.className = conflict.hasConflict ? "warn" : "muted";
-          conflictLine.textContent = conflict.hasConflict ? ("⚠ " + conflict.text) : "–";
-          left.appendChild(conflictLine);
-
-          const right = document.createElement("div");
-          right.className = "subrow-right";
-
-          const btnAdd = document.createElement("button");
-          btnAdd.className = "btn secondary";
-          btnAdd.type = "button";
-          btnAdd.textContent = "Stempel +";
-          btnAdd.onclick = () => {
-            const tRes = promptType("IN");
-            if (!tRes) return;
-            if (!tRes.ok) { alert(tRes.error); return; }
-
-            const timeRes = promptHHMM("08:00");
-            if (!timeRes) return;
-            if (!timeRes.ok) { alert(timeRes.error); return; }
-
-            const dt = new Date(year, month, d, timeRes.hh, timeRes.mm, 0, 0);
-            StorageService.addStamp({
-              type: tRes.type,
-              iso: dt.toISOString(),
-              year,
-              month: monthNr,
-              day: d,
-              hour: timeRes.hh,
-              minute: timeRes.mm,
-              second: 0,
-              timestamp: dt.getTime(),
-              manualRequired: false,
-              cutoffFlag: false
-            });
-
-            renderAll();
-            setHint(`Stempel hinzugefügt: ${dateStr} ${tRes.type} ${timeRes.raw}`);
-          };
-
-          const btnTime = document.createElement("button");
-          btnTime.className = "btn secondary";
-          btnTime.type = "button";
-          btnTime.textContent = "Zeit";
-          btnTime.onclick = () => openModal(dateStr);
-
-          right.appendChild(btnAdd);
-          right.appendChild(btnTime);
-
-          box.appendChild(left);
-          box.appendChild(right);
-
-          td2.appendChild(box);
-          tr2.appendChild(td2);
-
-          tbody.appendChild(tr1);
-          tbody.appendChild(tr2);
+        const absences = StorageService.getAbsences();
+        const absence = (Array.isArray(absences) ? absences : []).find(a => a && a.date === dateStr) || null;
+        if (!absence) {
+          dayModalAbsenceInfo.textContent = "Kein Eintrag";
+        } else if (absence.type === "VACATION") {
+          dayModalAbsenceInfo.textContent = absence.planned ? "Urlaub (geplant)" : (absence.auto ? "Urlaub (auto)" : "Urlaub");
+        } else if (absence.type === "SICK") {
+          dayModalAbsenceInfo.textContent = absence.auto ? "Krank (auto)" : "Krank";
+        } else if (absence.type === "WORK_MANUAL") {
+          dayModalAbsenceInfo.textContent = "Arbeit (manuell)";
+        } else {
+          dayModalAbsenceInfo.textContent = String(absence.type || "–");
         }
       }
+
+      dayModalBackdrop.onclick = closeDayModal;
+      btnDayModalClose.onclick = closeDayModal;
+
+      btnDayAddStamp.onclick = () => {
+        if (!currentDayModalDate) return;
+        const parts = parseDateParts(currentDayModalDate);
+        if (!parts) return;
+
+        const tRes = promptType("IN");
+        if (!tRes) return;
+        if (!tRes.ok) { alert(tRes.error); return; }
+
+        const timeRes = promptHHMM("08:00");
+        if (!timeRes) return;
+        if (!timeRes.ok) { alert(timeRes.error); return; }
+
+        const dt = new Date(parts.y, parts.m - 1, parts.d, timeRes.hh, timeRes.mm, 0, 0);
+        StorageService.addStamp({
+          type: tRes.type,
+          iso: dt.toISOString(),
+          year: parts.y,
+          month: parts.m,
+          day: parts.d,
+          hour: timeRes.hh,
+          minute: timeRes.mm,
+          second: 0,
+          timestamp: dt.getTime(),
+          manualRequired: false,
+          cutoffFlag: false
+        });
+
+        renderAll();
+        renderDayModal();
+        setHint(`Stempel hinzugefügt: ${currentDayModalDate} ${tRes.type} ${timeRes.raw}`);
+      };
+
+      btnDayManualEdit.onclick = () => {
+        if (!currentDayModalDate) return;
+        closeDayModal();
+        openModal(currentDayModalDate);
+      };
+
+      btnDayManualDelete.onclick = () => {
+        if (!currentDayModalDate) return;
+        ManualWorkService.remove(currentDayModalDate);
+        renderAll();
+        renderDayModal();
+      };
+
+      dayAbsenceActions.addEventListener("click", (event) => {
+        const btn = event.target.closest("button[data-action]");
+        if (!btn || !currentDayModalDate) return;
+        const action = btn.getAttribute("data-action");
+        if (action === "VACATION") AbsenceService.setAbsence(currentDayModalDate, AbsenceService.TYPES.VACATION);
+        if (action === "SICK") AbsenceService.setAbsence(currentDayModalDate, AbsenceService.TYPES.SICK);
+        if (action === "WORK_MANUAL") AbsenceService.setAbsence(currentDayModalDate, AbsenceService.TYPES.WORK_MANUAL);
+        if (action === "CLEAR") AbsenceService.clearAbsence(currentDayModalDate);
+        renderAll();
+        renderDayModal();
+      });
+
+      document.addEventListener("calendar:dayclick", (event) => {
+        const dateStr = event && event.detail ? event.detail.date : null;
+        if (dateStr) openDayModal(dateStr);
+      });
 
       function renderMainAndLastStampTop() {
         const data = StorageService.getData();
@@ -1040,8 +1065,8 @@
         const topMeta = document.getElementById("lastStampTopMeta");
 
         if (!last) {
-          lastStampValue.textContent = "–";
-          lastStampMeta.textContent = "Noch keine Stempel vorhanden";
+          if (lastStampValue) lastStampValue.textContent = "–";
+          if (lastStampMeta) lastStampMeta.textContent = "Noch keine Stempel vorhanden";
           topValue.textContent = "–";
           topAgo.textContent = "–";
           topMeta.textContent = "Noch keine Stempel vorhanden";
@@ -1049,8 +1074,8 @@
           const valueText = `${last.type} • ${formatDate(last)} ${formatTime(last)}`;
           const agoText = formatAgoFromTimestamp(last.timestamp);
 
-          lastStampValue.textContent = valueText;
-          lastStampMeta.textContent = `timestamp: ${last.timestamp}${last.manualRequired ? " • ⚠️ manuell" : ""}`;
+          if (lastStampValue) lastStampValue.textContent = valueText;
+          if (lastStampMeta) lastStampMeta.textContent = `timestamp: ${last.timestamp}${last.manualRequired ? " • ⚠️ manuell" : ""}`;
 
           topValue.textContent = valueText;
           topAgo.textContent = agoText;
@@ -1058,12 +1083,12 @@
         }
 
         const alerts = document.getElementById("alerts");
-        alerts.innerHTML = "";
+        if (alerts) alerts.innerHTML = "";
 
         const manual = stamps.filter(s => s && s.manualRequired);
-        if (manual.length === 0) {
+        if (alerts && manual.length === 0) {
           alerts.innerHTML = `<div class="muted">Keine</div>`;
-        } else {
+        } else if (alerts) {
           manual.slice(-5).reverse().forEach(s => {
             const div = document.createElement("div");
             div.className = "alert";
@@ -1097,7 +1122,6 @@
         renderAnalysis();
         renderCalendar();
         renderAbsences();
-        renderDaysStamps();
         renderMainAndLastStampTop();
       }
 
@@ -1111,12 +1135,12 @@
       document.getElementById("btnRecalc").onclick = () => { renderAnalysis(); renderCalendar(); };
       document.getElementById("btnAbsRefresh").onclick = () => {
         AbsenceService.ensureAutoVacationUpToYesterday();
-        renderAbsences(); renderCalendar(); renderAnalysis(); renderDaysStamps();
+        renderAbsences(); renderCalendar(); renderAnalysis();
       };
-      document.getElementById("btnManualRefresh").onclick = () => { renderDaysStamps(); renderAnalysis(); setHint("Tage aktualisiert"); };
-
-      document.getElementById("btnExportCsv").onclick = () => { ExportService.exportStampsCSV({ delimiter: ";" }); setHint("CSV exportiert"); };
-      document.getElementById("btnExportJson").onclick = () => { ExportService.exportAllJSON(); setHint("JSON exportiert"); };
+      document.getElementById("btnWeekPrev").onclick = () => { weekOffset -= 1; renderAnalysis(); };
+      document.getElementById("btnWeekNext").onclick = () => { weekOffset += 1; renderAnalysis(); };
+      document.getElementById("btnMonthPrev").onclick = () => { monthOffset -= 1; renderAnalysis(); };
+      document.getElementById("btnMonthNext").onclick = () => { monthOffset += 1; renderAnalysis(); };
 
       renderAll();
 

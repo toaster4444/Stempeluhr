@@ -22,6 +22,11 @@
     return { ...def, ...wd };
   }
 
+  function getDailyHoursSafe(settings) {
+    const dh = (settings && settings.dailyHours && typeof settings.dailyHours === "object") ? settings.dailyHours : {};
+    return { ...dh };
+  }
+
   function countSelectedWorkdaysPerWeek(workdays) {
     const keys = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
     return keys.reduce((sum, k) => sum + (workdays[k] ? 1 : 0), 0);
@@ -108,15 +113,24 @@
   function msToHours(ms) { return ms / 3600000; }
   function minutesToHours(min) { return min / 60; }
 
+  function formatMinutesPlain(totalMinutes) {
+    const mins = Math.max(0, Math.round(totalMinutes));
+    const hh = Math.floor(mins / 60);
+    const mm = mins % 60;
+    return `${hh}:${String(mm).padStart(2, "0")}`;
+  }
+
   function formatHours(hours) {
     if (hours === null || hours === undefined || Number.isNaN(hours)) return "–";
-    return hours.toFixed(2);
+    return formatMinutesPlain(hours * 60);
   }
 
   function formatSignedDiff(hours) {
     if (hours === null || hours === undefined || Number.isNaN(hours)) return "–";
-    const sign = hours > 0 ? "+" : "";
-    return sign + hours.toFixed(2);
+    const mins = Math.round(hours * 60);
+    if (mins === 0) return "0:00";
+    const sign = mins > 0 ? "+" : "-";
+    return `${sign}${formatMinutesPlain(Math.abs(mins))}`;
   }
 
   function weekdayKey(d) {
@@ -139,7 +153,10 @@
 
   function getWeeklyHoursFromSettings(settings) {
     if (settings && typeof settings.weeklyHours === "number") return settings.weeklyHours;
-    if (settings && typeof settings.weeklyPercent === "number") return (settings.weeklyPercent / 100) * 40;
+    if (settings && typeof settings.weeklyPercent === "number") {
+      const base = (settings && typeof settings.weeklyHoursFull === "number") ? settings.weeklyHoursFull : 40;
+      return (settings.weeklyPercent / 100) * base;
+    }
     return null;
   }
 
@@ -159,7 +176,9 @@
   }
 
   function computeTargetHoursForRange(settings, workdays, dailyTarget, start, endExclusive) {
-    if (dailyTarget === null || dailyTarget === undefined) return null;
+    const dailyHours = getDailyHoursSafe(settings);
+    const hasDailyHours = Object.values(dailyHours).some(v => typeof v === "number");
+    if (!hasDailyHours && (dailyTarget === null || dailyTarget === undefined)) return null;
 
     let target = 0;
     const d = new Date(start.getTime());
@@ -168,7 +187,11 @@
       d.setHours(0, 0, 0, 0);
 
       const key = weekdayKey(d);
-      if (workdays[key]) {
+      const baseTarget = (typeof dailyHours[key] === "number")
+        ? dailyHours[key]
+        : (workdays[key] ? dailyTarget : 0);
+
+      if (baseTarget > 0) {
         const dateStr = ymd(d);
         const legalOff = legalHolidayOffFactor(settings, d);
         const customOff = customHolidayFactorForDate(settings, dateStr);
@@ -176,7 +199,7 @@
         const offFactor = Math.max(legalOff, customOff);
         const requiredFraction = 1 - offFactor;
 
-        target += dailyTarget * requiredFraction;
+        target += baseTarget * requiredFraction;
       }
 
       d.setDate(d.getDate() + 1);
@@ -257,7 +280,8 @@
     return map;
   }
 
-  function getSummary() {
+  function getSummary(options) {
+    const opts = options || {};
     const data = window.StorageService ? StorageService.getData() : { stamps: [] };
     const stamps = Array.isArray(data.stamps) ? data.stamps : [];
 
@@ -268,12 +292,14 @@
     const selectedDaysPerWeek = countSelectedWorkdaysPerWeek(workdays);
 
     const now = new Date();
+    const weekBase = opts.weekDate instanceof Date ? opts.weekDate : now;
+    const monthBase = opts.monthDate instanceof Date ? opts.monthDate : now;
 
-    const wStart = startOfWeekMonday(now);
-    const wEnd = endOfWeekMondayExclusive(now);
+    const wStart = startOfWeekMonday(weekBase);
+    const wEnd = endOfWeekMondayExclusive(weekBase);
 
-    const mStart = startOfMonth(now);
-    const mEnd = endOfMonthExclusive(now);
+    const mStart = startOfMonth(monthBase);
+    const mEnd = endOfMonthExclusive(monthBase);
 
     // --- worked stamps per date + flags ---
     const weekStamp = computeStampWorkedByDate(stamps, wStart, wEnd);
