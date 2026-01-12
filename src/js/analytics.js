@@ -162,6 +162,15 @@
     return out;
   }
 
+  function getWeeklyHoursFromDaily(workdays, dailyByDay) {
+    if (!dailyByDay) return null;
+    return Object.keys(dailyByDay).reduce((sum, k) => sum + (workdays[k] ? dailyByDay[k] : 0), 0);
+  }
+
+  function approxEqual(a, b, eps = 0.01) {
+    return Math.abs(a - b) <= eps;
+  }
+
   function customHolidayFactorForDate(settings, dateStr) {
     const list = Array.isArray(settings.customHolidays) ? settings.customHolidays : [];
     const found = list.find(x => x && x.date === dateStr);
@@ -339,17 +348,20 @@
     // targets
     let dailyTarget = null;
     let dailyTargetByDay = null;
-    if (weeklyHours !== null && selectedDaysPerWeek > 0) {
+    const dailyByDay = getDailyHoursByDay(settings);
+    const weeklyFromDaily = getWeeklyHoursFromDaily(workdays, dailyByDay);
+    const canUseDailyByDay = weeklyHours === null
+      || (weeklyHours !== null && weeklyFromDaily !== null && approxEqual(weeklyFromDaily, weeklyHours));
+
+    if (canUseDailyByDay) {
+      dailyTargetByDay = dailyByDay;
+    } else if (selectedDaysPerWeek > 0 && weeklyHours !== null) {
       dailyTarget = weeklyHours / selectedDaysPerWeek;
-    } else {
-      dailyTargetByDay = getDailyHoursByDay(settings);
     }
 
-    const weeklyHoursEffective = (weeklyHours !== null && selectedDaysPerWeek > 0)
-      ? weeklyHours
-      : (dailyTargetByDay
-        ? Object.keys(dailyTargetByDay).reduce((sum, k) => sum + (workdays[k] ? dailyTargetByDay[k] : 0), 0)
-        : null);
+    const weeklyHoursEffective = (dailyTargetByDay && weeklyFromDaily !== null)
+      ? weeklyFromDaily
+      : (weeklyHours !== null && selectedDaysPerWeek > 0 ? weeklyHours : null);
 
     const weekTarget = computeTargetHoursForRange(settings, workdays, dailyTarget, dailyTargetByDay, wStart, wEnd);
     const monthTarget = computeTargetHoursForRange(settings, workdays, dailyTarget, dailyTargetByDay, mStart, mEnd);
