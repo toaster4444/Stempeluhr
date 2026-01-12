@@ -47,7 +47,7 @@
 
   /**
    * Exportiert Rohdaten als CSV, das Excel öffnen kann.
-   * Enthält: Datum, Uhrzeit, Stunde, Minute, Sekunde, ISO, Timestamp, Typ, manualRequired
+   * Enthält: Datum, Uhrzeit, Stunde, Minute, Sekunde, ISO, Timestamp, Typ, Quelle, manualRequired
    */
   function exportStampsCSV(options) {
     const opts = options || {};
@@ -58,6 +58,7 @@
 
     const headers = [
       "type",
+      "source",
       "date",
       "time",
       "year",
@@ -77,6 +78,7 @@
     for (const st of stamps) {
       const row = [
         safe(st.type),
+        st.manualEntry ? "Manuell" : "Automatisch",
         (st.year ? formatDate(st) : ""),
         (typeof st.hour === "number" ? formatTime(st) : ""),
         safe(st.year),
@@ -123,4 +125,3 @@
     exportAllJSON
   };
 })();
-

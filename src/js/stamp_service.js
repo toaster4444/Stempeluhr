@@ -28,7 +28,8 @@
       minute: mm,
       second: ss,
 
-      manualRequired: !!manualRequired
+      manualRequired: !!manualRequired,
+      manualEntry: false
     };
   }
 

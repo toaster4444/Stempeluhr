@@ -63,6 +63,7 @@
       type,
       ...current,
       manualRequired: needsManualFix,
+      manualEntry: false,
       // optional, falls du das später im UI gesondert markieren willst:
       cutoffFlag: needsManualFix
     };
