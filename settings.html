@@ -54,12 +54,6 @@
         </div>
       </div>
 
-      <div style="margin-top:0.75rem;">
-        <label class="label">Standardarbeitszeit pro Tag (Stunden)</label>
-        <div class="grid2" id="dailyHoursWrap"></div>
-        <p class="muted small">Pro Wochentag eintragen (z. B. Freitag 4.0).</p>
-      </div>
-
       <div class="row" style="margin-top:0.75rem;">
         <button class="btn" id="btnSaveHours" type="button">Speichern</button>
         <span class="muted small" id="hoursSavedHint">–</span>
@@ -68,7 +62,7 @@
 
     <section class="card">
       <h2>Arbeitstage (für Sollstunden)</h2>
-      <p class="muted small">Standard: Montag bis Freitag</p>
+      <p class="muted small">Standard: Montag bis Freitag • Stunden je Tag können hier eingetragen werden</p>
 
       <div class="actions" id="workdaysWrap"></div>
 
@@ -353,6 +347,10 @@
 
         const defaultDays = { mon:true, tue:true, wed:true, thu:true, fri:true, sat:false, sun:false };
         const workdays = settings.workdays || defaultDays;
+        const defaultHours = { mon: 8, tue: 8, wed: 8, thu: 8, fri: 8, sat: 0, sun: 0 };
+        const hours = (settings.standardDailyHoursByDay && typeof settings.standardDailyHoursByDay === "object")
+          ? settings.standardDailyHoursByDay
+          : {};
 
         DAYS.forEach(day => {
           const label = document.createElement("label");
@@ -360,6 +358,12 @@
           label.style.display = "flex";
           label.style.alignItems = "center";
           label.style.gap = "0.4rem";
+          label.style.justifyContent = "space-between";
+
+          const left = document.createElement("span");
+          left.style.display = "flex";
+          left.style.alignItems = "center";
+          left.style.gap = "0.4rem";
 
           const cb = document.createElement("input");
           cb.type = "checkbox";
@@ -369,45 +373,25 @@
           const span = document.createElement("span");
           span.textContent = day.label;
 
-          label.appendChild(cb);
-          label.appendChild(span);
-          wrap.appendChild(label);
-        });
-      }
-
-      function renderDailyHours(settings) {
-        const wrap = document.getElementById("dailyHoursWrap");
-        wrap.innerHTML = "";
-
-        const def = { mon: 8, tue: 8, wed: 8, thu: 8, fri: 8, sat: 0, sun: 0 };
-        const src = (settings.standardDailyHoursByDay && typeof settings.standardDailyHoursByDay === "object")
-          ? settings.standardDailyHoursByDay
-          : {};
-        const hours = { ...def, ...src };
-
-        DAYS.forEach(day => {
-          const box = document.createElement("div");
-
-          const label = document.createElement("label");
-          label.className = "label";
-          label.setAttribute("for", "dh_" + day.key);
-          label.textContent = day.label;
+          left.appendChild(cb);
+          left.appendChild(span);
 
           const input = document.createElement("input");
-          input.id = "dh_" + day.key;
+          input.id = "wd_hours_" + day.key;
           input.type = "number";
           input.step = "0.01";
           input.min = "0";
-          input.placeholder = "z. B. 8";
-          input.value = (typeof hours[day.key] === "number") ? String(hours[day.key]) : "";
-          input.style.width = "100%";
-          input.style.padding = "0.5rem";
+          input.placeholder = "0";
+          const v = Number(hours[day.key]);
+          input.value = (!Number.isNaN(v) ? v : defaultHours[day.key]);
+          input.style.width = "5rem";
+          input.style.padding = "0.3rem";
           input.style.border = "1px solid #ddd";
           input.style.borderRadius = "6px";
 
-          box.appendChild(label);
-          box.appendChild(input);
-          wrap.appendChild(box);
+          label.appendChild(left);
+          label.appendChild(input);
+          wrap.appendChild(label);
         });
       }
 
@@ -587,8 +571,6 @@
           (typeof s.weeklyHours === "number") ? s.weeklyHours : "";
         document.getElementById("weeklyPercent").value =
           (typeof s.weeklyPercent === "number") ? s.weeklyPercent : "";
-        renderDailyHours(s);
-
         document.getElementById("stateSelect").value = s.state || "";
         document.getElementById("ignoreHolidays").checked = !!s.ignoreHolidays;
 
@@ -642,18 +624,6 @@
           patch.weeklyHours = (p / 100) * 40;
         }
 
-        const dailyByDay = {};
-        for (const day of DAYS) {
-          const input = document.getElementById("dh_" + day.key);
-          const raw = input ? input.value : "";
-          if (raw === "") { setHint("hoursSavedHint", "Ungültige Standardarbeitszeit"); return; }
-          const daily = Number(raw);
-          if (Number.isNaN(daily) || daily < 0) { setHint("hoursSavedHint", "Ungültige Standardarbeitszeit"); return; }
-          dailyByDay[day.key] = daily;
-        }
-
-        patch.standardDailyHoursByDay = dailyByDay;
-
         saveSettings(patch);
         setHint("hoursSavedHint", "Gespeichert");
       });
@@ -661,11 +631,18 @@
       // Save: Workdays
       document.getElementById("btnSaveWorkdays").addEventListener("click", () => {
         const wd = {};
+        const dailyByDay = {};
         DAYS.forEach(day => {
           const cb = document.getElementById("wd_" + day.key);
+          const input = document.getElementById("wd_hours_" + day.key);
           wd[day.key] = !!(cb && cb.checked);
+          const raw = input ? input.value : "";
+          if (raw === "") { setHint("workdaysSavedHint", "Ungültige Stunden pro Tag"); return; }
+          const daily = Number(raw);
+          if (Number.isNaN(daily) || daily < 0) { setHint("workdaysSavedHint", "Ungültige Stunden pro Tag"); return; }
+          dailyByDay[day.key] = daily;
         });
-        saveSettings({ workdays: wd });
+        saveSettings({ workdays: wd, standardDailyHoursByDay: dailyByDay });
         setHint("workdaysSavedHint", "Gespeichert");
       });
 
