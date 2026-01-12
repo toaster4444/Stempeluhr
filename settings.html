@@ -262,14 +262,6 @@
     </section>
 
     <section class="card">
-      <h2>Wartung</h2>
-      <div class="row">
-        <button class="btn secondary" id="btnResetAll" type="button">Alle lokalen Daten löschen</button>
-        <span class="muted small">Vorsicht: löscht Stempel + Einstellungen</span>
-      </div>
-    </section>
-
-    <section class="card">
       <h2>Export</h2>
       <p class="muted small">
         Exportiert alle Stempelungen (automatisch + manuell) als Excel/CSV.
@@ -950,15 +942,6 @@
         clearAllPlanned();
         renderPlanned();
         setHint("plannedHint", "Alle geplanten Urlaube gelöscht");
-      });
-
-      // Reset
-      document.getElementById("btnResetAll").addEventListener("click", () => {
-        const ok = confirm("Wirklich ALLE lokalen Daten löschen? (Stempel + Einstellungen)");
-        if (!ok) return;
-        StorageService.clearAll();
-        loadIntoForm();
-        alert("Lokale Daten wurden gelöscht.");
       });
 
       const exportCsvBtn = document.getElementById("btnExportCsv");
