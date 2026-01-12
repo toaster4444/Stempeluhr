@@ -232,37 +232,6 @@
       <div id="calendarMount"></div>
     </section>
 
-    <section class="card">
-      <div class="row">
-        <h2>Fehltage (Urlaub/Krankheit)</h2>
-        <div class="row-right">
-          <button class="btn secondary" id="btnAbsRefresh" type="button">Aktualisieren</button>
-        </div>
-      </div>
-
-      <p class="muted small">
-        Automatisch: Soll-Tage ohne Stempel werden bis gestern als <b>Urlaub (auto)</b> markiert.
-        Mit <b>Zeit</b> kannst du für den Tag Arbeitszeit nachtragen (überschreibt Stempelzeit für diesen Tag).
-      </p>
-
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Datum</th>
-              <th>Status</th>
-              <th>Auto</th>
-              <th>⚠ Problem</th>
-              <th>Aktionen</th>
-            </tr>
-          </thead>
-          <tbody id="absTbody">
-            <tr><td colspan="5" class="muted">Keine</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
   </main>
 
   <!-- Modal: Tag bearbeiten -->
@@ -961,6 +930,7 @@
 
       function renderAbsences() {
         const tbody = document.getElementById("absTbody");
+        if (!tbody) return;
         tbody.innerHTML = "";
 
         const list = AbsenceService.listAbsencesForMonth(new Date());
@@ -1347,10 +1317,6 @@
       document.getElementById("monthPrev").onclick = () => { monthOffset -= 1; renderAnalysis(); };
       document.getElementById("monthNext").onclick = () => { monthOffset += 1; renderAnalysis(); };
       document.getElementById("monthToday").onclick = () => { monthOffset = 0; renderAnalysis(); };
-      document.getElementById("btnAbsRefresh").onclick = () => {
-        AbsenceService.ensureAutoVacationUpToYesterday();
-        renderAbsences(); renderCalendar(); renderAnalysis(); renderDaysStamps();
-      };
       const btnManualRefresh = document.getElementById("btnManualRefresh");
       if (btnManualRefresh) {
         btnManualRefresh.onclick = () => { renderDaysStamps(); renderAnalysis(); setHint("Tage aktualisiert"); };

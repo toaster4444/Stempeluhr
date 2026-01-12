@@ -104,23 +104,6 @@
       <div id="calendarMount"></div>
     </section>
 
-    <section class="card">
-      <div class="row">
-        <h2>Fehltage (Urlaub/Krankheit)</h2>
-        <div class="row-right">
-          <button class="btn secondary" id="btnAbsRefresh" type="button">Aktualisieren</button>
-        </div>
-      </div>
-
-      <div class="table-wrap">
-        <table class="table">
-          <tbody id="absTbody">
-            <tr><td colspan="5" class="muted">Keine</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
   </main>
 
   <footer class="footer muted">
@@ -220,8 +203,6 @@
       document.getElementById("monthPrev").onclick = () => { monthOffset -= 1; renderAnalysis(); };
       document.getElementById("monthNext").onclick = () => { monthOffset += 1; renderAnalysis(); };
       document.getElementById("monthToday").onclick = () => { monthOffset = 0; renderAnalysis(); };
-      document.getElementById("btnAbsRefresh").onclick = renderAll;
-
       renderAll();
     })();
   </script>
