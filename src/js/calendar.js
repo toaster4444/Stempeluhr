@@ -70,6 +70,108 @@
     return m;
   }
 
+  function minutesToHM(minutes) {
+    const mins = Math.max(0, Math.round(Number(minutes || 0)));
+    const hh = Math.floor(mins / 60);
+    const mm = mins % 60;
+    return `${hh}:${String(mm).padStart(2, "0")}`;
+  }
+
+  function sortStamps(stamps) {
+    return stamps
+      .filter(s => s && typeof s.timestamp === "number")
+      .slice()
+      .sort((a, b) => a.timestamp - b.timestamp);
+  }
+
+  function buildSessions(stampsSorted) {
+    const sessions = [];
+    let openIn = null;
+
+    for (const st of stampsSorted) {
+      if (st.type === "IN") { openIn = st; continue; }
+      if (st.type === "OUT") {
+        if (openIn && typeof openIn.timestamp === "number" && st.timestamp >= openIn.timestamp) {
+          sessions.push({ startTs: openIn.timestamp, endTs: st.timestamp });
+          openIn = null;
+        } else {
+          sessions.push({ startTs: null, endTs: st.timestamp });
+        }
+      }
+    }
+
+    if (openIn) sessions.push({ startTs: openIn.timestamp, endTs: null });
+    return sessions;
+  }
+
+  function splitSessionByDay(startTs, endTs) {
+    const map = new Map();
+    let cur = new Date(startTs);
+    const end = new Date(endTs);
+
+    while (cur.getTime() < end.getTime()) {
+      const dayStart = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate(), 0, 0, 0, 0).getTime();
+      const dayEnd = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1, 0, 0, 0, 0).getTime();
+
+      const segStart = Math.max(startTs, dayStart);
+      const segEnd = Math.min(endTs, dayEnd);
+
+      if (segEnd > segStart) {
+        const dateStr = ymd(new Date(dayStart));
+        map.set(dateStr, (map.get(dateStr) || 0) + (segEnd - segStart));
+      }
+
+      cur = new Date(dayEnd);
+    }
+
+    return map;
+  }
+
+  function computeStampMinutesByDate(periodStart, periodEndExclusive) {
+    if (!window.StorageService) return new Map();
+    const data = StorageService.getData();
+    const stamps = Array.isArray(data.stamps) ? data.stamps : [];
+    const sorted = sortStamps(stamps);
+    const sessions = buildSessions(sorted);
+    const dateMs = new Map();
+
+    for (const sess of sessions) {
+      if (typeof sess.startTs === "number" && typeof sess.endTs === "number") {
+        const s = Math.max(sess.startTs, periodStart.getTime());
+        const e = Math.min(sess.endTs, periodEndExclusive.getTime());
+        if (e > s) {
+          const parts = splitSessionByDay(s, e);
+          parts.forEach((ms, dateStr) => {
+            dateMs.set(dateStr, (dateMs.get(dateStr) || 0) + ms);
+          });
+        }
+      }
+    }
+
+    const minutesMap = new Map();
+    dateMs.forEach((ms, dateStr) => {
+      minutesMap.set(dateStr, Math.round(ms / 60000));
+    });
+    return minutesMap;
+  }
+
+  function computeManualMinutesByDate(periodStart, periodEndExclusive) {
+    if (!window.StorageService) return new Map();
+    const list = StorageService.getManualWork();
+    const map = new Map();
+
+    (Array.isArray(list) ? list : []).forEach(entry => {
+      if (!entry || !entry.date) return;
+      const d = new Date(entry.date + "T00:00:00");
+      if (Number.isNaN(d.getTime())) return;
+      if (d >= periodStart && d < periodEndExclusive) {
+        map.set(entry.date, Number(entry.minutesWorked || 0));
+      }
+    });
+
+    return map;
+  }
+
   // --- Problem-Map aus Stempeln bauen ---
   // Map: dateStr -> { issue:boolean, reasons:Set<string>, cutoff:boolean, openIn:boolean }
   function getStampIssueMap() {
@@ -127,6 +229,8 @@
     const now = targetDate || new Date();
     const start = monthStart(now);
     const endEx = monthEndExclusive(now);
+    const stampMinutesByDate = computeStampMinutesByDate(start, endEx);
+    const manualMinutesByDate = computeManualMinutesByDate(start, endEx);
 
     const monthLabel = start.toLocaleString("de-DE", { month: "long", year: "numeric" });
     const headers = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
@@ -153,6 +257,10 @@
 
       const abs = absMap.get(dateStr) || null;
       const issues = issueMap.get(dateStr) || null;
+      const manualMinutes = manualMinutesByDate.has(dateStr) ? manualMinutesByDate.get(dateStr) : null;
+      const stampMinutes = stampMinutesByDate.get(dateStr) || 0;
+      const recordedMinutes = manualMinutes !== null ? manualMinutes : stampMinutes;
+      const hasRecorded = manualMinutes !== null || stampMinutesByDate.has(dateStr);
 
       cells.push({
         empty: false,
@@ -164,7 +272,9 @@
         customOff,
         requiredFraction,
         abs,
-        issues
+        issues,
+        recordedMinutes,
+        hasRecorded
       });
 
       d.setDate(d.getDate() + 1);
@@ -230,6 +340,18 @@
       const div = document.createElement("div");
       div.className = classes.join(" ");
       if (hasIssue) div.title = issueTitle;
+      div.classList.add("cal-clickable");
+      div.setAttribute("role", "button");
+      div.setAttribute("tabindex", "0");
+      div.onclick = () => {
+        window.dispatchEvent(new CustomEvent("calendar:day-click", { detail: { dateStr: cell.dateStr } }));
+      };
+      div.onkeydown = (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          div.click();
+        }
+      };
 
       div.innerHTML = `
         <div class="cal-daynum">${cell.day}</div>
@@ -241,6 +363,8 @@
           ${abs ? `<span class="badge info">${absBadge}</span>` : ""}
           ${hasIssue ? `<span class="badge danger">⚠</span>` : ""}
         </div>
+
+        ${cell.hasRecorded ? `<div class="cal-time">Erfasst: ${minutesToHM(cell.recordedMinutes)}</div>` : ""}
 
         <div class="cal-label">${cell.isLegal ? cell.legalName : ""}</div>
         <div class="cal-label muted">${cell.customOff > 0 ? (cell.customOff === 1 ? "Custom frei" : `Custom Faktor ${cell.customOff}`) : ""}</div>
