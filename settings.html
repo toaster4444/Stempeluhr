@@ -248,8 +248,8 @@
         <table class="table">
           <thead>
             <tr>
-              <th>Datum</th>
-              <th>Typ</th>
+              <th>Zeitraum</th>
+              <th>Verbrauchte Urlaubstage</th>
               <th>Aktion</th>
             </tr>
           </thead>
@@ -282,6 +282,7 @@
 
   </main>
 
+  <script src="src/js/holidays.js"></script>
   <script src="src/js/storage.js"></script>
   <script src="src/js/export.js"></script>
 
@@ -535,15 +536,18 @@
           return;
         }
 
-        list.forEach(a => {
+        const groups = groupPlannedAbsences(list);
+        const settings = getSettings();
+
+        groups.forEach(group => {
           const tr = document.createElement("tr");
 
           const tdDate = document.createElement("td");
           tdDate.className = "mono";
-          tdDate.textContent = a.date;
+          tdDate.textContent = formatPlannedRange(group.from, group.to);
 
-          const tdType = document.createElement("td");
-          tdType.textContent = "Urlaub (geplant)";
+          const tdUsed = document.createElement("td");
+          tdUsed.textContent = formatVacationDaysLabel(computeUsedVacationDaysForDates(settings, group.dates));
 
           const tdAct = document.createElement("td");
           const btn = document.createElement("button");
@@ -551,17 +555,165 @@
           btn.type = "button";
           btn.textContent = "Entfernen";
           btn.onclick = () => {
-            removePlannedVacationDay(a.date);
+            group.dates.forEach(dateStr => removePlannedVacationDay(dateStr));
             renderPlanned();
             setHint("plannedHint", "Entfernt");
           };
           tdAct.appendChild(btn);
 
           tr.appendChild(tdDate);
-          tr.appendChild(tdType);
+          tr.appendChild(tdUsed);
           tr.appendChild(tdAct);
           tbody.appendChild(tr);
         });
+      }
+
+      function weekdayKey(d) {
+        const dow = d.getDay(); // 0..6
+        return dow === 1 ? "mon"
+          : dow === 2 ? "tue"
+          : dow === 3 ? "wed"
+          : dow === 4 ? "thu"
+          : dow === 5 ? "fri"
+          : dow === 6 ? "sat"
+          : "sun";
+      }
+
+      function getWorkdaysSafe(settings) {
+        const def = { mon:true, tue:true, wed:true, thu:true, fri:true, sat:false, sun:false };
+        const wd = (settings && settings.workdays && typeof settings.workdays === "object") ? settings.workdays : def;
+        return { ...def, ...wd };
+      }
+
+      function getDailyHoursByDay(settings) {
+        const def = { mon: 8, tue: 8, wed: 8, thu: 8, fri: 8, sat: 0, sun: 0 };
+        const src = (settings && settings.standardDailyHoursByDay && typeof settings.standardDailyHoursByDay === "object")
+          ? settings.standardDailyHoursByDay
+          : {};
+        const out = { ...def };
+        Object.keys(def).forEach(k => {
+          const v = Number(src[k]);
+          if (!Number.isNaN(v) && v >= 0) out[k] = v;
+        });
+        return out;
+      }
+
+      function getStandardDailyHoursForDate(settings, dateObj) {
+        const map = getDailyHoursByDay(settings);
+        const key = weekdayKey(dateObj);
+        return map[key];
+      }
+
+      function getVacationDayHours(settings) {
+        const v = Number(settings && settings.vacationDayHours);
+        if (!Number.isNaN(v) && v > 0) return v;
+        return 8;
+      }
+
+      function customOffFactor(settings, dateStr) {
+        const list = Array.isArray(settings.customHolidays) ? settings.customHolidays : [];
+        const found = list.find(x => x && x.date === dateStr);
+        if (!found) return 0;
+        const f = Number(found.factor);
+        if (Number.isNaN(f) || f < 0) return 0;
+        return Math.min(1, f);
+      }
+
+      function legalOffFactor(settings, dateObj) {
+        if (!window.HolidaysService || !HolidaysService.getHolidayInfo) return 0;
+        const info = HolidaysService.getHolidayInfo(settings, dateObj);
+        return info && info.offFactor ? info.offFactor : 0;
+      }
+
+      function requiredWorkFraction(settings, workdays, dateObj) {
+        const key = weekdayKey(dateObj);
+        if (!workdays[key]) return 0;
+
+        const dateStr = `${String(dateObj.getFullYear()).padStart(4, "0")}-${pad2(dateObj.getMonth() + 1)}-${pad2(dateObj.getDate())}`;
+        const off = Math.max(
+          legalOffFactor(settings, dateObj),
+          customOffFactor(settings, dateStr)
+        );
+        const req = 1 - off;
+        return req > 0 ? req : 0;
+      }
+
+      function computeUsedVacationDaysForDates(settings, dateStrs) {
+        const workdays = getWorkdaysSafe(settings);
+        const vacationDayHours = getVacationDayHours(settings);
+        let used = 0;
+
+        dateStrs.forEach(dateStr => {
+          const parsed = parseDateYYYYMMDD(dateStr);
+          if (!parsed) return;
+          const d = new Date(parsed.y, parsed.mo - 1, parsed.d, 0, 0, 0, 0);
+          if (Number.isNaN(d.getTime())) return;
+
+          const req = requiredWorkFraction(settings, workdays, d);
+          if (req <= 0) return;
+
+          const standardDailyHours = getStandardDailyHoursForDate(settings, d);
+          const dayFactor = standardDailyHours / vacationDayHours;
+          used += req * dayFactor;
+        });
+
+        return used;
+      }
+
+      function formatVacationDaysLabel(value) {
+        const rounded = Math.round(value * 100) / 100;
+        let str = rounded.toFixed(2);
+        str = str.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+        str = str.replace(".", ",");
+        const unit = rounded === 1 ? "Tag" : "Tage";
+        return `${str} ${unit}`;
+      }
+
+      function formatPlannedRange(fromStr, toStr) {
+        if (fromStr === toStr) {
+          return `Urlaub am ${formatDateDisplay(fromStr)}`;
+        }
+        return `Urlaub vom ${formatDateDisplay(fromStr)}–${formatDateDisplay(toStr)}`;
+      }
+
+      function formatDateDisplay(dateStr) {
+        const p = parseDateYYYYMMDD(dateStr);
+        if (!p) return dateStr;
+        return `${pad2(p.d)}.${pad2(p.mo)}.${String(p.y).padStart(4, "0")}`;
+      }
+
+      function groupPlannedAbsences(list) {
+        const groups = [];
+        let current = null;
+
+        list.forEach(a => {
+          const parsed = parseDateYYYYMMDD(a.date);
+          if (!parsed) return;
+          const d = new Date(parsed.y, parsed.mo - 1, parsed.d, 0, 0, 0, 0);
+          if (Number.isNaN(d.getTime())) return;
+
+          if (!current) {
+            current = { from: a.date, to: a.date, lastDate: d, dates: [a.date] };
+            return;
+          }
+
+          const next = new Date(current.lastDate.getTime());
+          next.setDate(next.getDate() + 1);
+          if (next.getTime() === d.getTime()) {
+            current.to = a.date;
+            current.lastDate = d;
+            current.dates.push(a.date);
+          } else {
+            groups.push({ from: current.from, to: current.to, dates: current.dates.slice() });
+            current = { from: a.date, to: a.date, lastDate: d, dates: [a.date] };
+          }
+        });
+
+        if (current) {
+          groups.push({ from: current.from, to: current.to, dates: current.dates.slice() });
+        }
+
+        return groups;
       }
 
       function loadIntoForm() {
