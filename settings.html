@@ -932,6 +932,12 @@
         const to = document.getElementById("pvTo").value.trim();
         const res = addPlannedRange(from, to || from);
         if (!res.ok) { setHint("plannedHint", res.error); return; }
+        const plannedList = getPlannedAbsences();
+        const plannedTotalUsed = computeUsedVacationDaysForDates(getSettings(), plannedList.map(item => item.date));
+        const totalAvailable = computeTotalAvailableVacationDays(getSettings());
+        if (totalAvailable !== null && plannedTotalUsed > totalAvailable) {
+          alert(`Warnung: Geplanter Urlaub (${formatVacationDaysLabel(plannedTotalUsed)}) übersteigt verfügbare Urlaubstage (${formatVacationDaysLabel(totalAvailable)}).`);
+        }
         document.getElementById("pvFrom").value = "";
         document.getElementById("pvTo").value = "";
         renderPlanned();
