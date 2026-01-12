@@ -761,6 +761,10 @@
         return date.toLocaleString("de-DE", { month: "long", year: "numeric" });
       }
 
+      function formatDateEU(date) {
+        return date.toLocaleDateString("de-DE");
+      }
+
       function renderAnalysis() {
         const summary = Analytics.getSummary({
           weekDate: getWeekReferenceDate(),
@@ -768,8 +772,8 @@
         });
 
         const weekNumber = getIsoWeekNumber(summary.week.start);
-        document.getElementById("weekRange").textContent =
-          `KW ${String(weekNumber).padStart(2, "0")} • ${Analytics.formatDateYYYYMMDD(summary.week.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.week.endExclusive.getTime() - 1))}`;
+        document.getElementById("weekRange").innerHTML =
+          `<strong>KW ${String(weekNumber).padStart(2, "0")}</strong> • ${formatDateEU(summary.week.start)} bis ${formatDateEU(new Date(summary.week.endExclusive.getTime() - 1))}`;
 
         document.getElementById("weekWorked").textContent = Analytics.formatHours(summary.week.workedHours);
         document.getElementById("weekManualAdded").textContent =
@@ -783,8 +787,8 @@
           `Stempel-Hinweise: Manuell: ${summary.week.manualCount} • Offene IN: ${summary.week.openCount} • OUT ohne IN: ${summary.week.unmatchedOutCount}`;
 
         const monthLabel = getMonthLabel(summary.month.start);
-        document.getElementById("monthRange").textContent =
-          `${monthLabel} • ${Analytics.formatDateYYYYMMDD(summary.month.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.month.endExclusive.getTime() - 1))}`;
+        document.getElementById("monthRange").innerHTML =
+          `<strong>${monthLabel}</strong>`;
 
         document.getElementById("monthWorked").textContent = Analytics.formatHours(summary.month.workedHours);
         document.getElementById("monthManualAdded").textContent =
