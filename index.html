@@ -228,7 +228,7 @@
     </section>
 
     <section class="card">
-      <h2>Kalender (Feiertage & Abwesenheiten)</h2>
+      <h2>Kalender</h2>
       <div id="calendarMount"></div>
     </section>
 
@@ -338,16 +338,39 @@
 
   </main>
 
-  <!-- Modal: Arbeitszeit nachtragen -->
+  <!-- Modal: Tag bearbeiten -->
   <div id="manualModal" class="modal hidden" aria-hidden="true">
     <div class="modal-backdrop" id="modalBackdrop"></div>
     <div class="modal-card">
       <div class="row">
-        <h3 style="margin:0;">Arbeitszeit nachtragen</h3>
+        <h3 style="margin:0;">Tag bearbeiten</h3>
         <button class="btn secondary" id="btnModalClose" type="button">✕</button>
       </div>
 
       <div class="muted small" id="modalDateLabel">–</div>
+
+      <div style="margin-top:0.75rem;">
+        <div class="label">Gestempelte Zeiten</div>
+        <div id="dayStampList" class="stamp-edit-list muted small">–</div>
+
+        <div class="grid2" style="margin-top:0.5rem;">
+          <div>
+            <label class="label" for="dayStampType">Typ</label>
+            <select id="dayStampType" style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+              <option value="IN">IN</option>
+              <option value="OUT">OUT</option>
+            </select>
+          </div>
+          <div>
+            <label class="label" for="dayStampTime">Uhrzeit (HH:MM)</label>
+            <input id="dayStampTime" type="time" style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:0.5rem;">
+          <button class="btn secondary" id="btnAddStamp" type="button">Stempel hinzufügen</button>
+        </div>
+      </div>
 
       <div class="grid2" style="margin-top:0.75rem;">
         <div>
@@ -368,10 +391,27 @@
 
       <div class="muted small" style="margin-top:0.5rem;" id="mwPreview">–</div>
       <div class="muted small warn" style="margin-top:0.5rem;" id="mwError"></div>
+      <div class="muted small" style="margin-top:0.5rem;" id="mwStatus"></div>
 
       <div class="row" style="margin-top:0.75rem;">
         <button class="btn" id="btnMwSave" type="button">Speichern</button>
         <button class="btn secondary" id="btnMwDelete" type="button">Löschen</button>
+      </div>
+
+      <div style="margin-top:1rem;">
+        <div class="label">Abwesenheit</div>
+        <select id="dayAbsenceSelect" style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+          <option value="">Keine</option>
+          <option value="VACATION">Urlaub</option>
+          <option value="VACATION_AUTO">Urlaub (auto)</option>
+          <option value="SICK">Krank</option>
+          <option value="WORK_MANUAL">Arbeit (manuell)</option>
+        </select>
+
+        <div class="row" style="margin-top:0.5rem;">
+          <button class="btn secondary" id="btnAbsenceSave" type="button">Speichern</button>
+          <button class="btn secondary" id="btnAbsenceClear" type="button">Entfernen</button>
+        </div>
       </div>
     </div>
   </div>
@@ -642,17 +682,128 @@
       const modalBackdrop = document.getElementById("modalBackdrop");
       const btnModalClose = document.getElementById("btnModalClose");
       const modalDateLabel = document.getElementById("modalDateLabel");
+      const dayStampList = document.getElementById("dayStampList");
+      const dayStampType = document.getElementById("dayStampType");
+      const dayStampTime = document.getElementById("dayStampTime");
+      const btnAddStamp = document.getElementById("btnAddStamp");
       const mwStart = document.getElementById("mwStart");
       const mwEnd = document.getElementById("mwEnd");
       const mwBreak = document.getElementById("mwBreak");
       const mwPreview = document.getElementById("mwPreview");
       const mwError = document.getElementById("mwError");
+      const mwStatus = document.getElementById("mwStatus");
       const btnMwSave = document.getElementById("btnMwSave");
       const btnMwDelete = document.getElementById("btnMwDelete");
+      const dayAbsenceSelect = document.getElementById("dayAbsenceSelect");
+      const btnAbsenceSave = document.getElementById("btnAbsenceSave");
+      const btnAbsenceClear = document.getElementById("btnAbsenceClear");
 
-      function openModal(dateStr) {
-        currentModalDate = dateStr;
+      function parseYmdParts(dateStr) {
+        const m = String(dateStr || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m) return null;
+        return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
+      }
+
+      function toStampDate(dateStr, timeStr) {
+        const parts = parseYmdParts(dateStr);
+        if (!parts) return null;
+        const m = String(timeStr || "").match(/^(\d{1,2}):(\d{2})$/);
+        if (!m) return null;
+        const hh = Number(m[1]);
+        const mm = Number(m[2]);
+        if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+        const dt = new Date(parts.year, parts.month - 1, parts.day, hh, mm, 0, 0);
+        return { dt, hh, mm, parts };
+      }
+
+      function getAbsenceByDate(dateStr) {
+        const abs = StorageService.getAbsences();
+        return (Array.isArray(abs) ? abs : []).find(a => a && a.date === dateStr) || null;
+      }
+
+      function renderStampList(dateStr) {
+        const data = StorageService.getData();
+        const stampsAll = Array.isArray(data.stamps) ? data.stamps : [];
+        const parts = parseYmdParts(dateStr);
+        if (!parts) return;
+
+        const stampsForDay = stampsAll
+          .filter(s => s && s.year === parts.year && s.month === parts.month && s.day === parts.day)
+          .slice()
+          .sort((a, b) => a.timestamp - b.timestamp);
+
+        dayStampList.innerHTML = "";
+
+        if (!stampsForDay.length) {
+          dayStampList.textContent = "Keine Stempel.";
+          return;
+        }
+
+        stampsForDay.forEach(st => {
+          const row = document.createElement("div");
+          row.className = "stamp-edit-row";
+
+          const typeSelect = document.createElement("select");
+          typeSelect.innerHTML = `
+            <option value="IN">IN</option>
+            <option value="OUT">OUT</option>
+          `;
+          typeSelect.value = st.type || "IN";
+
+          const timeInput = document.createElement("input");
+          timeInput.type = "time";
+          timeInput.value = `${pad2(st.hour)}:${pad2(st.minute)}`;
+
+          const btnUpdate = document.createElement("button");
+          btnUpdate.className = "btn secondary mini";
+          btnUpdate.type = "button";
+          btnUpdate.textContent = "Ändern";
+          btnUpdate.onclick = () => {
+            const t = toStampDate(dateStr, timeInput.value);
+            if (!t) { alert("Ungültige Zeit."); return; }
+
+            StorageService.updateStampByTimestamp(st.timestamp, {
+              type: typeSelect.value,
+              hour: t.hh,
+              minute: t.mm,
+              second: 0,
+              timestamp: t.dt.getTime(),
+              iso: t.dt.toISOString(),
+              year: t.parts.year,
+              month: t.parts.month,
+              day: t.parts.day,
+              manualRequired: false,
+              cutoffFlag: false,
+              manualEntry: true
+            });
+
+            renderAll();
+            renderStampList(dateStr);
+          };
+
+          const btnDelete = document.createElement("button");
+          btnDelete.className = "btn secondary mini";
+          btnDelete.type = "button";
+          btnDelete.textContent = "Löschen";
+          btnDelete.onclick = () => {
+            const ok = confirm(`Diesen Stempel löschen?\n${st.type} ${pad2(st.hour)}:${pad2(st.minute)} (${dateStr})`);
+            if (!ok) return;
+            StorageService.deleteStampByTimestamp(st.timestamp);
+            renderAll();
+            renderStampList(dateStr);
+          };
+
+          row.appendChild(typeSelect);
+          row.appendChild(timeInput);
+          row.appendChild(btnUpdate);
+          row.appendChild(btnDelete);
+          dayStampList.appendChild(row);
+        });
+      }
+
+      function refreshModalData(dateStr) {
         mwError.textContent = "";
+        mwStatus.textContent = "";
         modalDateLabel.textContent = `Datum: ${dateStr}`;
 
         const existing = ManualWorkService.getByDate(dateStr);
@@ -666,7 +817,22 @@
           mwBreak.value = "0";
         }
 
+        const absence = getAbsenceByDate(dateStr);
+        if (!absence) {
+          dayAbsenceSelect.value = "";
+        } else if (absence.type === "VACATION" && absence.auto) {
+          dayAbsenceSelect.value = "VACATION_AUTO";
+        } else {
+          dayAbsenceSelect.value = absence.type || "";
+        }
+
+        renderStampList(dateStr);
         updatePreview();
+      }
+
+      function openModal(dateStr) {
+        currentModalDate = dateStr;
+        refreshModalData(dateStr);
 
         modal.classList.remove("hidden");
         modal.setAttribute("aria-hidden", "false");
@@ -680,6 +846,7 @@
 
       function updatePreview() {
         mwError.textContent = "";
+        mwStatus.textContent = "";
         if (!currentModalDate) { mwPreview.textContent = "–"; return; }
 
         const s = mwStart.value;
@@ -721,15 +888,65 @@
         if (!res.ok) { mwError.textContent = res.error; return; }
 
         AbsenceService.setAbsence(currentModalDate, AbsenceService.TYPES.WORK_MANUAL);
-        closeModal();
+        mwStatus.textContent = "Manuelle Zeit gespeichert.";
         renderAll();
+        refreshModalData(currentModalDate);
       };
 
       btnMwDelete.onclick = () => {
         if (!currentModalDate) return;
         ManualWorkService.remove(currentModalDate);
-        closeModal();
+        const absence = getAbsenceByDate(currentModalDate);
+        if (absence && absence.type === "WORK_MANUAL") AbsenceService.clearAbsence(currentModalDate);
+        mwStatus.textContent = "Manuelle Zeit gelöscht.";
         renderAll();
+        refreshModalData(currentModalDate);
+      };
+
+      btnAddStamp.onclick = () => {
+        if (!currentModalDate) return;
+        const t = toStampDate(currentModalDate, dayStampTime.value);
+        if (!t) { alert("Bitte eine gültige Uhrzeit angeben."); return; }
+
+        StorageService.addStamp({
+          type: dayStampType.value,
+          iso: t.dt.toISOString(),
+          year: t.parts.year,
+          month: t.parts.month,
+          day: t.parts.day,
+          hour: t.hh,
+          minute: t.mm,
+          second: 0,
+          timestamp: t.dt.getTime(),
+          manualRequired: false,
+          cutoffFlag: false,
+          manualEntry: true
+        });
+
+        dayStampTime.value = "";
+        renderAll();
+        renderStampList(currentModalDate);
+      };
+
+      btnAbsenceSave.onclick = () => {
+        if (!currentModalDate) return;
+        const val = dayAbsenceSelect.value;
+        if (!val) {
+          AbsenceService.clearAbsence(currentModalDate);
+        } else if (val === "VACATION_AUTO") {
+          AbsenceService.setAbsenceWithFlags(currentModalDate, AbsenceService.TYPES.VACATION, { auto: true });
+        } else {
+          AbsenceService.setAbsence(currentModalDate, val);
+        }
+        renderAll();
+        refreshModalData(currentModalDate);
+      };
+
+      btnAbsenceClear.onclick = () => {
+        if (!currentModalDate) return;
+        AbsenceService.clearAbsence(currentModalDate);
+        renderAll();
+        refreshModalData(currentModalDate);
       };
 
       // ---------- Rendering ----------
@@ -809,6 +1026,11 @@
       function renderCalendar() {
         if (window.CalendarView) CalendarView.renderMonth("calendarMount", new Date());
       }
+
+      window.addEventListener("calendar:day-click", (event) => {
+        const dateStr = event && event.detail ? event.detail.dateStr : null;
+        if (dateStr) openModal(dateStr);
+      });
 
       function renderAbsences() {
         const tbody = document.getElementById("absTbody");

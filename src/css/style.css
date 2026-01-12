@@ -345,6 +345,16 @@ a {
   gap: 0.25rem;
 }
 
+.cal-clickable {
+  cursor: pointer;
+}
+
+.cal-time {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
 .cal-empty {
   background: transparent;
   border: none;
@@ -470,6 +480,20 @@ a {
   border-radius: 14px;
   padding: 1rem;
   box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+}
+
+.stamp-edit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.stamp-edit-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: 0.35rem;
+  align-items: center;
 }
 /* =========
    Problem-Markierung (rot)

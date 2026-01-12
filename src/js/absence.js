@@ -176,6 +176,21 @@
     return true;
   }
 
+  function setAbsenceWithFlags(dateStr, type, flags) {
+    const d = parseYmd(dateStr);
+    if (!d) return false;
+
+    const rec = {
+      date: dateStr,
+      type,
+      auto: !!(flags && flags.auto),
+      planned: !!(flags && flags.planned),
+      updatedAt: Date.now()
+    };
+    StorageService.upsertAbsence(rec);
+    return true;
+  }
+
   // Optional: geplant setzen (für geplanten Urlaub)
   function setPlannedVacation(dateStr) {
     const d = parseYmd(dateStr);
@@ -215,6 +230,7 @@
     TYPES,
     ensureAutoVacationUpToYesterday,
     setAbsence,
+    setAbsenceWithFlags,
     setPlannedVacation,
     clearAbsence,
     listAbsencesForMonth
