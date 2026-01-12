@@ -261,9 +261,22 @@
       </div>
     </section>
 
+    <section class="card">
+      <h2>Export</h2>
+      <p class="muted small">
+        Exportiert alle Stempelungen (automatisch + manuell) als Excel/CSV.
+      </p>
+      <div class="row" style="margin-top:0.75rem;">
+        <button class="btn" id="btnExportCsv" type="button">Export (Excel/CSV)</button>
+        <button class="btn secondary" id="btnExportJson" type="button">Backup (JSON)</button>
+        <span class="muted small" id="exportHint">–</span>
+      </div>
+    </section>
+
   </main>
 
   <script src="src/js/storage.js"></script>
+  <script src="src/js/export.js"></script>
 
   <script src="src/js/install.js"></script>
   <script>
@@ -709,6 +722,22 @@
         loadIntoForm();
         alert("Lokale Daten wurden gelöscht.");
       });
+
+      const exportCsvBtn = document.getElementById("btnExportCsv");
+      if (exportCsvBtn) {
+        exportCsvBtn.addEventListener("click", () => {
+          ExportService.exportStampsCSV({ delimiter: ";" });
+          setHint("exportHint", "CSV exportiert");
+        });
+      }
+
+      const exportJsonBtn = document.getElementById("btnExportJson");
+      if (exportJsonBtn) {
+        exportJsonBtn.addEventListener("click", () => {
+          ExportService.exportAllJSON();
+          setHint("exportHint", "JSON exportiert");
+        });
+      }
 
       loadIntoForm();
     })();

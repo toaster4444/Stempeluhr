@@ -300,17 +300,9 @@
         <h2>Rohdaten (letzte 30 angezeigt)</h2>
         <div class="row-right">
           <button class="btn secondary" id="btnRefresh" type="button">Aktualisieren</button>
+          <span class="muted small" id="exportHint">–</span>
         </div>
       </div>
-
-      <div class="actions" style="margin: 0.5rem 0 0.75rem;">
-        <button class="btn" id="btnExportCsv" type="button">Export (Excel/CSV)</button>
-        <button class="btn secondary" id="btnExportJson" type="button">Backup (JSON)</button>
-        <span class="muted small" id="exportHint">–</span>
-      </div>
-      <p class="muted small" style="margin-top:-0.5rem;">
-        Export enthält alle verfügbaren Rohdaten.
-      </p>
 
       <div class="table-wrap">
         <table class="table">
@@ -377,7 +369,6 @@
   <script src="src/js/storage.js"></script>
   <script src="src/js/clock.js"></script>
 
-  <script src="src/js/export.js"></script>
 
   <script src="src/js/holidays.js"></script>
   <script src="src/js/analytics.js"></script>
@@ -906,7 +897,8 @@
                   month: monthNr,
                   day: d,
                   manualRequired: false,
-                  cutoffFlag: false
+                  cutoffFlag: false,
+                  manualEntry: true
                 });
 
                 renderAll();
@@ -1000,7 +992,8 @@
               second: 0,
               timestamp: dt.getTime(),
               manualRequired: false,
-              cutoffFlag: false
+              cutoffFlag: false,
+              manualEntry: true
             });
 
             renderAll();
@@ -1114,9 +1107,6 @@
         renderAbsences(); renderCalendar(); renderAnalysis(); renderDaysStamps();
       };
       document.getElementById("btnManualRefresh").onclick = () => { renderDaysStamps(); renderAnalysis(); setHint("Tage aktualisiert"); };
-
-      document.getElementById("btnExportCsv").onclick = () => { ExportService.exportStampsCSV({ delimiter: ";" }); setHint("CSV exportiert"); };
-      document.getElementById("btnExportJson").onclick = () => { ExportService.exportAllJSON(); setHint("JSON exportiert"); };
 
       renderAll();
 
