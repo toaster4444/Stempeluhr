@@ -108,15 +108,21 @@
   function msToHours(ms) { return ms / 3600000; }
   function minutesToHours(min) { return min / 60; }
 
-  function formatHours(hours) {
-    if (hours === null || hours === undefined || Number.isNaN(hours)) return "–";
-    return hours.toFixed(2);
+  function formatHours(minutesOrHours, withSign) {
+    if (minutesOrHours === null || minutesOrHours === undefined || Number.isNaN(minutesOrHours)) return "–";
+    const totalMinutes = Math.round(minutesOrHours * 60);
+    const absMinutes = Math.abs(totalMinutes);
+    const hours = Math.floor(absMinutes / 60);
+    const minutes = absMinutes % 60;
+    const sign = withSign
+      ? (totalMinutes > 0 ? "+" : totalMinutes < 0 ? "-" : "")
+      : (totalMinutes < 0 ? "-" : "");
+    return `${sign}${hours}:${String(minutes).padStart(2, "0")}`;
   }
 
   function formatSignedDiff(hours) {
     if (hours === null || hours === undefined || Number.isNaN(hours)) return "–";
-    const sign = hours > 0 ? "+" : "";
-    return sign + hours.toFixed(2);
+    return formatHours(hours, true);
   }
 
   function weekdayKey(d) {
@@ -273,7 +279,10 @@
     return map;
   }
 
-  function getSummary() {
+  function getSummary(options) {
+    const opts = options || {};
+    const weekBase = opts.weekDate ? new Date(opts.weekDate) : new Date();
+    const monthBase = opts.monthDate ? new Date(opts.monthDate) : new Date();
     const data = window.StorageService ? StorageService.getData() : { stamps: [] };
     const stamps = Array.isArray(data.stamps) ? data.stamps : [];
 
@@ -283,13 +292,11 @@
     const weeklyHours = getWeeklyHoursFromSettings(settings);
     const selectedDaysPerWeek = countSelectedWorkdaysPerWeek(workdays);
 
-    const now = new Date();
+    const wStart = startOfWeekMonday(weekBase);
+    const wEnd = endOfWeekMondayExclusive(weekBase);
 
-    const wStart = startOfWeekMonday(now);
-    const wEnd = endOfWeekMondayExclusive(now);
-
-    const mStart = startOfMonth(now);
-    const mEnd = endOfMonthExclusive(now);
+    const mStart = startOfMonth(monthBase);
+    const mEnd = endOfMonthExclusive(monthBase);
 
     // --- worked stamps per date + flags ---
     const weekStamp = computeStampWorkedByDate(stamps, wStart, wEnd);
