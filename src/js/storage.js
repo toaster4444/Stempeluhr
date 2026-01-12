@@ -19,11 +19,15 @@
         // Jahreswechsel-Erkennung
         vacationYearLastSeen: null,
 
+        // Arbeitszeit
+        standardDailyHours: 8,
+
         // Urlaub
         vacationAvailable: null,      // Anspruch aktuelles Jahr (z. B. 30)
         carryoverYear: null,          // aus welchem Jahr kommt carryover (z. B. 2025)
         carryoverDays: null,          // ursprüngliche carryover Tage (Info)
         carryoverRemaining: null,     // aktuell verfügbarer carryover (wird bei Jahreswechsel neu gesetzt)
+        vacationDayHours: 8,
 
         // Arbeitstage
         workdays: { mon:true, tue:true, wed:true, thu:true, fri:true, sat:false, sun:false },
@@ -68,6 +72,12 @@
 
     // customHolidays default absichern
     if (!Array.isArray(merged.settings.customHolidays)) merged.settings.customHolidays = [];
+
+    // Arbeitszeit-Defaults absichern
+    const daily = Number(merged.settings.standardDailyHours);
+    if (Number.isNaN(daily) || daily <= 0) merged.settings.standardDailyHours = base.settings.standardDailyHours;
+    const vacHours = Number(merged.settings.vacationDayHours);
+    if (Number.isNaN(vacHours) || vacHours <= 0) merged.settings.vacationDayHours = base.settings.vacationDayHours;
 
     return merged;
   }
@@ -138,6 +148,32 @@
     return info && info.offFactor ? info.offFactor : 0;
   }
 
+  function getWeeklyHoursFromSettings(settings) {
+    if (settings && typeof settings.weeklyHours === "number") return settings.weeklyHours;
+    if (settings && typeof settings.weeklyPercent === "number") return (settings.weeklyPercent / 100) * 40;
+    return null;
+  }
+
+  function countSelectedWorkdaysPerWeek(workdays) {
+    const keys = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+    return keys.reduce((sum, k) => sum + (workdays[k] ? 1 : 0), 0);
+  }
+
+  function getStandardDailyHours(settings, workdays) {
+    const weekly = getWeeklyHoursFromSettings(settings);
+    const days = countSelectedWorkdaysPerWeek(workdays);
+    if (weekly !== null && days > 0) return weekly / days;
+    const daily = Number(settings && settings.standardDailyHours);
+    if (!Number.isNaN(daily) && daily > 0) return daily;
+    return 8;
+  }
+
+  function getVacationDayHours(settings) {
+    const v = Number(settings && settings.vacationDayHours);
+    if (!Number.isNaN(v) && v > 0) return v;
+    return 8;
+  }
+
   // required work fraction: 0 / 0.5 / 1 ...
   function requiredWorkFraction(settings, workdays, dateObj) {
     const key = weekdayKey(dateObj);
@@ -165,6 +201,9 @@
   function computeUsedVacationDaysForYear(data, year) {
     const settings = data.settings || {};
     const workdays = getWorkdaysSafe(settings);
+    const standardDailyHours = getStandardDailyHours(settings, workdays);
+    const vacationDayHours = getVacationDayHours(settings);
+    const dayFactor = standardDailyHours / vacationDayHours;
 
     const abs = Array.isArray(data.absences) ? data.absences : [];
     const stamps = Array.isArray(data.stamps) ? data.stamps : [];
@@ -184,7 +223,7 @@
       const req = requiredWorkFraction(settings, workdays, d);
       if (req <= 0) return;
 
-      used += req;
+      used += req * dayFactor;
     });
 
     return used;
@@ -314,6 +353,11 @@
       data.settings.workdays = { mon:true, tue:true, wed:true, thu:true, fri:true, sat:false, sun:false, ...data.settings.workdays };
     }
     if (!Array.isArray(data.settings.customHolidays)) data.settings.customHolidays = [];
+
+    const daily = Number(data.settings.standardDailyHours);
+    if (Number.isNaN(daily) || daily <= 0) data.settings.standardDailyHours = 8;
+    const vacHours = Number(data.settings.vacationDayHours);
+    if (Number.isNaN(vacHours) || vacHours <= 0) data.settings.vacationDayHours = 8;
 
     save(data);
   }

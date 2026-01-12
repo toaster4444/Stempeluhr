@@ -54,6 +54,13 @@
         </div>
       </div>
 
+      <div style="margin-top:0.75rem;">
+        <label class="label" for="standardDailyHours">Standardarbeitszeit pro Tag (Stunden)</label>
+        <input id="standardDailyHours" type="number" step="0.01" min="0" placeholder="z. B. 8"
+               style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+        <p class="muted small">Wird genutzt, wenn keine Wochenstunden gesetzt sind.</p>
+      </div>
+
       <div class="row" style="margin-top:0.75rem;">
         <button class="btn" id="btnSaveHours" type="button">Speichern</button>
         <span class="muted small" id="hoursSavedHint">–</span>
@@ -182,6 +189,13 @@
             Nicht gestempelte Soll-Tage werden automatisch als Urlaub markiert und können nachträglich auf Krankheit oder Arbeit geändert werden.
           </p>
         </div>
+      </div>
+
+      <div style="margin-top:0.75rem;">
+        <label class="label" for="vacationDayHours">Standard-Urlaubstag in Stunden</label>
+        <input id="vacationDayHours" type="number" step="0.01" min="0" placeholder="z. B. 8"
+               style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+        <p class="muted small">Wird für die Umrechnung von Urlaubstagen in Stunden genutzt.</p>
       </div>
 
       <hr style="margin: 1rem 0; border:0; border-top:1px solid #eee;" />
@@ -538,6 +552,8 @@
           (typeof s.weeklyHours === "number") ? s.weeklyHours : "";
         document.getElementById("weeklyPercent").value =
           (typeof s.weeklyPercent === "number") ? s.weeklyPercent : "";
+        document.getElementById("standardDailyHours").value =
+          (typeof s.standardDailyHours === "number") ? s.standardDailyHours : 8;
 
         document.getElementById("stateSelect").value = s.state || "";
         document.getElementById("ignoreHolidays").checked = !!s.ignoreHolidays;
@@ -546,6 +562,8 @@
 
         document.getElementById("vacationAvailable").value =
           (typeof s.vacationAvailable === "number") ? s.vacationAvailable : "";
+        document.getElementById("vacationDayHours").value =
+          (typeof s.vacationDayHours === "number") ? s.vacationDayHours : 8;
 
         document.getElementById("carryoverYear").value =
           (typeof s.carryoverYear === "number") ? s.carryoverYear : "";
@@ -577,6 +595,7 @@
       document.getElementById("btnSaveHours").addEventListener("click", () => {
         const hoursRaw = document.getElementById("weeklyHours").value;
         const percRaw = document.getElementById("weeklyPercent").value;
+        const dailyRaw = document.getElementById("standardDailyHours").value;
 
         const patch = {};
 
@@ -589,6 +608,14 @@
           const p = Number(percRaw);
           patch.weeklyPercent = p;
           patch.weeklyHours = (p / 100) * 40;
+        }
+
+        if (dailyRaw === "") {
+          patch.standardDailyHours = null;
+        } else {
+          const daily = Number(dailyRaw);
+          if (Number.isNaN(daily) || daily <= 0) { setHint("hoursSavedHint", "Ungültige Standardarbeitszeit"); return; }
+          patch.standardDailyHours = daily;
         }
 
         saveSettings(patch);
@@ -661,6 +688,7 @@
         const raw = document.getElementById("vacationAvailable").value;
         const cyRaw = document.getElementById("carryoverYear").value;
         const cdRaw = document.getElementById("carryoverDays").value;
+        const vacHoursRaw = document.getElementById("vacationDayHours").value;
 
         const patch = {};
 
@@ -688,6 +716,14 @@
           patch.carryoverDays = d;
           // Beim erstmaligen Eintragen setzen wir den "Rest" gleich.
           patch.carryoverRemaining = d;
+        }
+
+        if (vacHoursRaw === "") {
+          patch.vacationDayHours = null;
+        } else {
+          const vh = Number(vacHoursRaw);
+          if (Number.isNaN(vh) || vh <= 0) { setHint("vacationSavedHint", "Ungültige Stunden pro Urlaubstag"); return; }
+          patch.vacationDayHours = vh;
         }
 
         saveSettings(patch);

@@ -143,6 +143,14 @@
     return null;
   }
 
+  function getDailyHoursFromSettings(settings, selectedDaysPerWeek) {
+    const weekly = getWeeklyHoursFromSettings(settings);
+    if (weekly !== null && selectedDaysPerWeek > 0) return weekly / selectedDaysPerWeek;
+    const daily = Number(settings && settings.standardDailyHours);
+    if (!Number.isNaN(daily) && daily > 0) return daily;
+    return null;
+  }
+
   function customHolidayFactorForDate(settings, dateStr) {
     const list = Array.isArray(settings.customHolidays) ? settings.customHolidays : [];
     const found = list.find(x => x && x.date === dateStr);
@@ -314,10 +322,10 @@
     const monthWorked = sumWithOverride(monthStamp.dateMs, monthManualByDate);
 
     // targets
-    let dailyTarget = null;
-    if (weeklyHours !== null && selectedDaysPerWeek > 0) {
-      dailyTarget = weeklyHours / selectedDaysPerWeek;
-    }
+    const dailyTarget = getDailyHoursFromSettings(settings, selectedDaysPerWeek);
+    const weeklyHoursEffective = (weeklyHours !== null && selectedDaysPerWeek > 0)
+      ? weeklyHours
+      : (dailyTarget !== null ? dailyTarget * selectedDaysPerWeek : null);
 
     const weekTarget = computeTargetHoursForRange(settings, workdays, dailyTarget, wStart, wEnd);
     const monthTarget = computeTargetHoursForRange(settings, workdays, dailyTarget, mStart, mEnd);
@@ -355,7 +363,7 @@
         unmatchedOutCount: monthStamp.unmatchedOutCount
       },
       meta: {
-        weeklyHoursSetting: weeklyHours,
+        weeklyHoursSetting: weeklyHoursEffective,
         selectedWorkdaysPerWeek: selectedDaysPerWeek
       }
     };
