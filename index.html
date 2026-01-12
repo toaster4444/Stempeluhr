@@ -263,79 +263,6 @@
       </div>
     </section>
 
-    <section class="card">
-      <div class="row">
-        <h2>Tage & Stempel (aktueller Monat)</h2>
-        <div class="row-right">
-          <button class="btn secondary" id="btnManualRefresh" type="button">Aktualisieren</button>
-        </div>
-      </div>
-
-      <p class="muted small">
-        Es werden nur Tage bis heute angezeigt. Konflikte stehen darunter in rot.
-        Pro Tag kannst du Stempel hinzufügen, bearbeiten oder löschen. „Zeit“ öffnet den Arbeitszeit-Nachtrag.
-      </p>
-
-      <div class="table-wrap">
-        <table class="table days-table">
-          <thead>
-            <tr>
-              <th style="width: 120px;">Datum</th>
-              <th>Stempel (IN/OUT)</th>
-              <th style="width: 260px;">Manuell</th>
-            </tr>
-          </thead>
-          <tbody id="daysTbody">
-            <tr><td colspan="3" class="muted">Lade…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Status</h2>
-      <div class="grid2">
-        <div>
-          <div class="label">Letzter Stempel</div>
-          <div class="value" id="lastStampValue">–</div>
-          <div class="muted" id="lastStampMeta">–</div>
-        </div>
-        <div>
-          <div class="label">Hinweise</div>
-          <div id="alerts" class="alerts">
-            <div class="muted">Keine</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="row">
-        <h2>Rohdaten (letzte 30 angezeigt)</h2>
-        <div class="row-right">
-          <button class="btn secondary" id="btnRefresh" type="button">Aktualisieren</button>
-          <span class="muted small" id="exportHint">–</span>
-        </div>
-      </div>
-
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Typ</th>
-              <th>Datum</th>
-              <th>Uhrzeit</th>
-              <th>ISO</th>
-              <th>Manuell nötig</th>
-            </tr>
-          </thead>
-          <tbody id="stampsTbody">
-            <tr><td colspan="5" class="muted">Noch keine Einträge</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
   </main>
 
   <!-- Modal: Tag bearbeiten -->
@@ -1127,6 +1054,7 @@
 
       function renderDaysStamps() {
         const tbody = document.getElementById("daysTbody");
+        if (!tbody) return;
         tbody.innerHTML = "";
 
         const data = StorageService.getData();
@@ -1335,8 +1263,8 @@
         const topMeta = document.getElementById("lastStampTopMeta");
 
         if (!last) {
-          lastStampValue.textContent = "–";
-          lastStampMeta.textContent = "Noch keine Stempel vorhanden";
+          if (lastStampValue) lastStampValue.textContent = "–";
+          if (lastStampMeta) lastStampMeta.textContent = "Noch keine Stempel vorhanden";
           topValue.textContent = "–";
           topAgo.textContent = "–";
           topMeta.textContent = "Noch keine Stempel vorhanden";
@@ -1344,8 +1272,10 @@
           const valueText = `${last.type} • ${formatDate(last)} ${formatTime(last)}`;
           const agoText = formatAgoFromTimestamp(last.timestamp);
 
-          lastStampValue.textContent = valueText;
-          lastStampMeta.textContent = `timestamp: ${last.timestamp}${last.manualRequired ? " • ⚠️ manuell" : ""}`;
+          if (lastStampValue) lastStampValue.textContent = valueText;
+          if (lastStampMeta) {
+            lastStampMeta.textContent = `timestamp: ${last.timestamp}${last.manualRequired ? " • ⚠️ manuell" : ""}`;
+          }
 
           topValue.textContent = valueText;
           topAgo.textContent = agoText;
@@ -1353,37 +1283,41 @@
         }
 
         const alerts = document.getElementById("alerts");
-        alerts.innerHTML = "";
+        if (alerts) {
+          alerts.innerHTML = "";
 
-        const manual = stamps.filter(s => s && s.manualRequired);
-        if (manual.length === 0) {
-          alerts.innerHTML = `<div class="muted">Keine</div>`;
-        } else {
-          manual.slice(-5).reverse().forEach(s => {
-            const div = document.createElement("div");
-            div.className = "alert";
-            div.textContent = `⚠️ Manuelle Prüfung: ${formatDate(s)} ${formatTime(s)}`;
-            alerts.appendChild(div);
-          });
+          const manual = stamps.filter(s => s && s.manualRequired);
+          if (manual.length === 0) {
+            alerts.innerHTML = `<div class="muted">Keine</div>`;
+          } else {
+            manual.slice(-5).reverse().forEach(s => {
+              const div = document.createElement("div");
+              div.className = "alert";
+              div.textContent = `⚠️ Manuelle Prüfung: ${formatDate(s)} ${formatTime(s)}`;
+              alerts.appendChild(div);
+            });
+          }
         }
 
         const tbody = document.getElementById("stampsTbody");
-        tbody.innerHTML = "";
+        if (tbody) {
+          tbody.innerHTML = "";
 
-        if (stamps.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="5" class="muted">Noch keine Einträge</td></tr>`;
-        } else {
-          stamps.slice(-30).reverse().forEach(st => {
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-              <td class="${st.manualRequired ? "warn" : ""}">${st.type}</td>
-              <td>${formatDate(st)}</td>
-              <td>${formatTime(st)}</td>
-              <td class="mono">${st.iso}</td>
-              <td class="${st.manualRequired ? "warn" : "muted"}">${st.manualRequired ? "JA" : "nein"}</td>
-            `;
-            tbody.appendChild(tr);
-          });
+          if (stamps.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="muted">Noch keine Einträge</td></tr>`;
+          } else {
+            stamps.slice(-30).reverse().forEach(st => {
+              const tr = document.createElement("tr");
+              tr.innerHTML = `
+                <td class="${st.manualRequired ? "warn" : ""}">${st.type}</td>
+                <td>${formatDate(st)}</td>
+                <td>${formatTime(st)}</td>
+                <td class="mono">${st.iso}</td>
+                <td class="${st.manualRequired ? "warn" : "muted"}">${st.manualRequired ? "JA" : "nein"}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+          }
         }
       }
 
@@ -1402,7 +1336,10 @@
         renderAll();
       };
 
-      document.getElementById("btnRefresh").onclick = () => { renderAll(); setHint("Aktualisiert"); };
+      const btnRefresh = document.getElementById("btnRefresh");
+      if (btnRefresh) {
+        btnRefresh.onclick = () => { renderAll(); setHint("Aktualisiert"); };
+      }
       document.getElementById("btnRecalc").onclick = () => { renderAnalysis(); renderCalendar(); };
       document.getElementById("weekPrev").onclick = () => { weekOffset -= 1; renderAnalysis(); };
       document.getElementById("weekNext").onclick = () => { weekOffset += 1; renderAnalysis(); };
@@ -1414,7 +1351,10 @@
         AbsenceService.ensureAutoVacationUpToYesterday();
         renderAbsences(); renderCalendar(); renderAnalysis(); renderDaysStamps();
       };
-      document.getElementById("btnManualRefresh").onclick = () => { renderDaysStamps(); renderAnalysis(); setHint("Tage aktualisiert"); };
+      const btnManualRefresh = document.getElementById("btnManualRefresh");
+      if (btnManualRefresh) {
+        btnManualRefresh.onclick = () => { renderDaysStamps(); renderAnalysis(); setHint("Tage aktualisiert"); };
+      }
 
       renderAll();
 
