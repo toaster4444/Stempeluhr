@@ -153,14 +153,28 @@
         return d;
       }
 
+      function getIsoWeekNumber(date) {
+        const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = utcDate.getUTCDay() || 7;
+        utcDate.setUTCDate(utcDate.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+        const weekNo = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7);
+        return weekNo;
+      }
+
+      function getMonthLabel(date) {
+        return date.toLocaleString("de-DE", { month: "long", year: "numeric" });
+      }
+
       function renderAnalysis() {
         const summary = Analytics.getSummary({
           weekDate: getWeekReferenceDate(),
           monthDate: getMonthReferenceDate()
         });
 
+        const weekNumber = getIsoWeekNumber(summary.week.start);
         document.getElementById("weekRange").textContent =
-          `${Analytics.formatDateYYYYMMDD(summary.week.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.week.endExclusive.getTime() - 1))}`;
+          `KW ${String(weekNumber).padStart(2, "0")} • ${Analytics.formatDateYYYYMMDD(summary.week.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.week.endExclusive.getTime() - 1))}`;
 
         document.getElementById("weekWorked").textContent = Analytics.formatHours(summary.week.workedHours);
         document.getElementById("weekManualAdded").textContent =
@@ -173,8 +187,9 @@
         document.getElementById("weekFlags").textContent =
           `Stempel-Hinweise: Manuell: ${summary.week.manualCount} • Offene IN: ${summary.week.openCount} • OUT ohne IN: ${summary.week.unmatchedOutCount}`;
 
+        const monthLabel = getMonthLabel(summary.month.start);
         document.getElementById("monthRange").textContent =
-          `${Analytics.formatDateYYYYMMDD(summary.month.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.month.endExclusive.getTime() - 1))}`;
+          `${monthLabel} • ${Analytics.formatDateYYYYMMDD(summary.month.start)} bis ${Analytics.formatDateYYYYMMDD(new Date(summary.month.endExclusive.getTime() - 1))}`;
 
         document.getElementById("monthWorked").textContent = Analytics.formatHours(summary.month.workedHours);
         document.getElementById("monthManualAdded").textContent =
