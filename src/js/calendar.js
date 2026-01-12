@@ -254,6 +254,7 @@
       const customOff = customFactorForDate(settings, dateStr);
       const offFactor = Math.max(legal.offFactor || 0, customOff || 0);
       const requiredFraction = 1 - offFactor;
+      const isSollDay = isWorkday && requiredFraction > 0;
 
       const abs = absMap.get(dateStr) || null;
       const issues = issueMap.get(dateStr) || null;
@@ -266,7 +267,7 @@
         empty: false,
         day: d.getDate(),
         dateStr,
-        isWorkday,
+        isWorkday: isSollDay,
         legalName: legal.name || "",
         isLegal: !!legal.isHoliday,
         customOff,
