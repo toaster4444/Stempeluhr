@@ -723,21 +723,19 @@
       }
 
       function updatePlannedWarning(settings, plannedTotalUsed) {
-        const remaining = computeRemainingVacationDays(settings);
-        if (remaining === null) {
+        const totalAvailable = computeTotalAvailableVacationDays(settings);
+        if (totalAvailable === null) {
           setHint("plannedWarning", "–");
           return;
         }
-        if (plannedTotalUsed > remaining) {
-          setHint("plannedWarning", `Warnung: Geplanter Urlaub (${formatVacationDaysLabel(plannedTotalUsed)}) übersteigt verfügbare Urlaubstage (${formatVacationDaysLabel(remaining)}).`);
+        if (plannedTotalUsed > totalAvailable) {
+          setHint("plannedWarning", `Warnung: Geplanter Urlaub (${formatVacationDaysLabel(plannedTotalUsed)}) übersteigt verfügbare Urlaubstage (${formatVacationDaysLabel(totalAvailable)}).`);
         } else {
           setHint("plannedWarning", "–");
         }
       }
 
-      function computeRemainingVacationDays(settings) {
-        const data = StorageService.getData();
-        const year = new Date().getFullYear();
+      function computeTotalAvailableVacationDays(settings) {
         const available = Number(settings && settings.vacationAvailable);
         const carryoverRemaining = Number(settings && settings.carryoverRemaining);
         const carryoverDays = Number(settings && settings.carryoverDays);
@@ -746,42 +744,7 @@
             : 0;
         const totalAvailable = (!Number.isNaN(available) ? available : 0) + carryover;
         if (totalAvailable <= 0) return null;
-        const used = computeUsedVacationDaysForYear(data, year);
-        return Math.max(0, totalAvailable - used);
-      }
-
-      function computeUsedVacationDaysForYear(data, year) {
-        const settings = data.settings || {};
-        const workdays = getWorkdaysSafe(settings);
-        const vacationDayHours = getVacationDayHours(settings);
-        const abs = Array.isArray(data.absences) ? data.absences : [];
-        const stamps = Array.isArray(data.stamps) ? data.stamps : [];
-        let used = 0;
-
-        abs.forEach(a => {
-          if (!a || a.type !== "VACATION" || !a.date) return;
-          const parsed = parseDateYYYYMMDD(a.date);
-          if (!parsed) return;
-          const d = new Date(parsed.y, parsed.mo - 1, parsed.d, 0, 0, 0, 0);
-          if (Number.isNaN(d.getTime())) return;
-          if (d.getFullYear() !== year) return;
-          if (hasStampOnDate(stamps, a.date)) return;
-          const req = requiredWorkFraction(settings, workdays, d);
-          if (req <= 0) return;
-          const standardDailyHours = getStandardDailyHoursForDate(settings, d);
-          const dayFactor = standardDailyHours / vacationDayHours;
-          used += req * dayFactor;
-        });
-
-        return used;
-      }
-
-      function hasStampOnDate(stamps, dateStr) {
-        return (Array.isArray(stamps) ? stamps : []).some(s => {
-          if (!s || !s.year) return false;
-          const ds = `${s.year}-${pad2(s.month)}-${pad2(s.day)}`;
-          return ds === dateStr;
-        });
+        return totalAvailable;
       }
 
       function loadIntoForm() {
