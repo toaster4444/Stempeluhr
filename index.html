@@ -434,6 +434,31 @@
         return info && info.offFactor ? info.offFactor : 0;
       }
 
+      function getDailyHoursByDay(settings) {
+        const def = { mon: 8, tue: 8, wed: 8, thu: 8, fri: 8, sat: 0, sun: 0 };
+        const src = (settings && settings.standardDailyHoursByDay && typeof settings.standardDailyHoursByDay === "object")
+          ? settings.standardDailyHoursByDay
+          : {};
+        const out = { ...def };
+        Object.keys(def).forEach(k => {
+          const v = Number(src[k]);
+          if (!Number.isNaN(v) && v >= 0) out[k] = v;
+        });
+        return out;
+      }
+
+      function getStandardDailyHoursForDate(settings, dateObj) {
+        const map = getDailyHoursByDay(settings);
+        const key = weekdayKey(dateObj);
+        return map[key];
+      }
+
+      function getVacationDayHours(settings) {
+        const hours = Number(settings && settings.vacationDayHours);
+        if (!Number.isNaN(hours) && hours > 0) return hours;
+        return 8;
+      }
+
       function ymdFromDate(d) {
         return `${String(d.getFullYear()).padStart(4, "0")}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
       }
@@ -470,6 +495,7 @@
       function computeVacationStats() {
         const settings = StorageService.getSettings() || {};
         const workdays = getWorkdaysSafe(settings);
+        const vacationDayHours = getVacationDayHours(settings);
 
         const totalYear = Number(settings.vacationAvailable || 0);
         const carry = (typeof settings.carryoverRemaining === "number")
@@ -506,12 +532,15 @@
           const req = requiredWorkFraction(settings, workdays, d);
           if (req <= 0) return;
 
+          const standardDailyHours = getStandardDailyHoursForDate(settings, d);
+          const dayFactor = standardDailyHours / vacationDayHours;
+
           if (d.getTime() <= today.getTime()) {
             // bis heute: auto + manuell + geplant zählen -> verbraucht
-            usedSoFar += req;
+            usedSoFar += req * dayFactor;
           } else {
             // Zukunft: nur "geplant" soll abgezogen werden
-            if (a.planned === true) plannedFuture += req;
+            if (a.planned === true) plannedFuture += req * dayFactor;
           }
         });
 

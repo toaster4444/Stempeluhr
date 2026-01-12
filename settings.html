@@ -62,7 +62,7 @@
 
     <section class="card">
       <h2>Arbeitstage (für Sollstunden)</h2>
-      <p class="muted small">Standard: Montag bis Freitag</p>
+      <p class="muted small">Standard: Montag bis Freitag • Stunden je Tag können hier eingetragen werden</p>
 
       <div class="actions" id="workdaysWrap"></div>
 
@@ -182,6 +182,13 @@
             Nicht gestempelte Soll-Tage werden automatisch als Urlaub markiert und können nachträglich auf Krankheit oder Arbeit geändert werden.
           </p>
         </div>
+      </div>
+
+      <div style="margin-top:0.75rem;">
+        <label class="label" for="vacationDayHours">Standard-Urlaubstag in Stunden</label>
+        <input id="vacationDayHours" type="number" step="0.01" min="0" placeholder="z. B. 8"
+               style="width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:6px;">
+        <p class="muted small">Wird für die Umrechnung von Urlaubstagen in Stunden genutzt.</p>
       </div>
 
       <hr style="margin: 1rem 0; border:0; border-top:1px solid #eee;" />
@@ -340,6 +347,10 @@
 
         const defaultDays = { mon:true, tue:true, wed:true, thu:true, fri:true, sat:false, sun:false };
         const workdays = settings.workdays || defaultDays;
+        const defaultHours = { mon: 8, tue: 8, wed: 8, thu: 8, fri: 8, sat: 0, sun: 0 };
+        const hours = (settings.standardDailyHoursByDay && typeof settings.standardDailyHoursByDay === "object")
+          ? settings.standardDailyHoursByDay
+          : {};
 
         DAYS.forEach(day => {
           const label = document.createElement("label");
@@ -347,6 +358,12 @@
           label.style.display = "flex";
           label.style.alignItems = "center";
           label.style.gap = "0.4rem";
+          label.style.justifyContent = "space-between";
+
+          const left = document.createElement("span");
+          left.style.display = "flex";
+          left.style.alignItems = "center";
+          left.style.gap = "0.4rem";
 
           const cb = document.createElement("input");
           cb.type = "checkbox";
@@ -356,8 +373,24 @@
           const span = document.createElement("span");
           span.textContent = day.label;
 
-          label.appendChild(cb);
-          label.appendChild(span);
+          left.appendChild(cb);
+          left.appendChild(span);
+
+          const input = document.createElement("input");
+          input.id = "wd_hours_" + day.key;
+          input.type = "number";
+          input.step = "0.01";
+          input.min = "0";
+          input.placeholder = "0";
+          const v = Number(hours[day.key]);
+          input.value = (!Number.isNaN(v) ? v : defaultHours[day.key]);
+          input.style.width = "5rem";
+          input.style.padding = "0.3rem";
+          input.style.border = "1px solid #ddd";
+          input.style.borderRadius = "6px";
+
+          label.appendChild(left);
+          label.appendChild(input);
           wrap.appendChild(label);
         });
       }
@@ -538,7 +571,6 @@
           (typeof s.weeklyHours === "number") ? s.weeklyHours : "";
         document.getElementById("weeklyPercent").value =
           (typeof s.weeklyPercent === "number") ? s.weeklyPercent : "";
-
         document.getElementById("stateSelect").value = s.state || "";
         document.getElementById("ignoreHolidays").checked = !!s.ignoreHolidays;
 
@@ -546,6 +578,8 @@
 
         document.getElementById("vacationAvailable").value =
           (typeof s.vacationAvailable === "number") ? s.vacationAvailable : "";
+        document.getElementById("vacationDayHours").value =
+          (typeof s.vacationDayHours === "number") ? s.vacationDayHours : 8;
 
         document.getElementById("carryoverYear").value =
           (typeof s.carryoverYear === "number") ? s.carryoverYear : "";
@@ -577,7 +611,6 @@
       document.getElementById("btnSaveHours").addEventListener("click", () => {
         const hoursRaw = document.getElementById("weeklyHours").value;
         const percRaw = document.getElementById("weeklyPercent").value;
-
         const patch = {};
 
         if (hoursRaw !== "" && !Number.isNaN(Number(hoursRaw))) {
@@ -598,11 +631,18 @@
       // Save: Workdays
       document.getElementById("btnSaveWorkdays").addEventListener("click", () => {
         const wd = {};
+        const dailyByDay = {};
         DAYS.forEach(day => {
           const cb = document.getElementById("wd_" + day.key);
+          const input = document.getElementById("wd_hours_" + day.key);
           wd[day.key] = !!(cb && cb.checked);
+          const raw = input ? input.value : "";
+          if (raw === "") { setHint("workdaysSavedHint", "Ungültige Stunden pro Tag"); return; }
+          const daily = Number(raw);
+          if (Number.isNaN(daily) || daily < 0) { setHint("workdaysSavedHint", "Ungültige Stunden pro Tag"); return; }
+          dailyByDay[day.key] = daily;
         });
-        saveSettings({ workdays: wd });
+        saveSettings({ workdays: wd, standardDailyHoursByDay: dailyByDay });
         setHint("workdaysSavedHint", "Gespeichert");
       });
 
@@ -661,6 +701,7 @@
         const raw = document.getElementById("vacationAvailable").value;
         const cyRaw = document.getElementById("carryoverYear").value;
         const cdRaw = document.getElementById("carryoverDays").value;
+        const vacHoursRaw = document.getElementById("vacationDayHours").value;
 
         const patch = {};
 
@@ -688,6 +729,14 @@
           patch.carryoverDays = d;
           // Beim erstmaligen Eintragen setzen wir den "Rest" gleich.
           patch.carryoverRemaining = d;
+        }
+
+        if (vacHoursRaw === "") {
+          patch.vacationDayHours = null;
+        } else {
+          const vh = Number(vacHoursRaw);
+          if (Number.isNaN(vh) || vh <= 0) { setHint("vacationSavedHint", "Ungültige Stunden pro Urlaubstag"); return; }
+          patch.vacationDayHours = vh;
         }
 
         saveSettings(patch);
